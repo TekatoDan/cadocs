@@ -1,8 +1,38 @@
+# dependencies
 node_modules/
+/.pnp
+.pnp.*
+.yarn/install-state.gz
+
+# testing
+coverage/
+
+# next.js
+/.next/
+/out/
+
+# production
 build/
 dist/
-coverage/
+
+# misc
 .DS_Store
+*.pem
 *.log
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
 .env*
 !.env.example
+
+# prisma
+src/lib/generated/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

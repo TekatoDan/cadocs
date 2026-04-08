@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  fullName  String?  @map("full_name")
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teamsCreated       Team[]
+  teamMemberships    TeamMember[]
+  foldersCreated     Folder[]
+  filesCreated       File[]           @relation("FileCreator")
+  filesLocked        File[]           @relation("FileLock")
+  permissionsOwned   FilePermission[] @relation("PermissionUser")
+  permissionsGranted FilePermission[] @relation("PermissionGrantor")
+  auditLogs          AuditLog[]
+  messages           Message[]
+
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator  User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  members  TeamMember[]
+  folders  Folder[]
+  files    File[]
+  logs     AuditLog[]
+  messages Message[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(uuid()) @db.Uuid
+  teamId   String   @map("team_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  role     String   @default("member")
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model Folder {
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  name      String
+  parentId  String?  @map("parent_id") @db.Uuid
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderHierarchy")
+  creator  User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  files    File[]
+
+  @@unique([teamId, parentId, name])
+  @@map("folders")
+}
+
+model File {
+  id          String    @id @default(uuid()) @db.Uuid
+  teamId      String    @map("team_id") @db.Uuid
+  folderId    String?   @map("folder_id") @db.Uuid
+  name        String
+  description String?
+  storagePath String    @map("storage_path")
+  sizeBytes   BigInt    @map("size_bytes")
+  mimeType    String    @map("mime_type")
+  version     Int       @default(1)
+  status      String    @default("draft")
+  lockedBy    String?   @map("locked_by") @db.Uuid
+  lockedAt    DateTime? @map("locked_at") @db.Timestamptz(6)
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  team         Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  folder       Folder?          @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  creator      User?            @relation("FileCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  lockedByUser User?            @relation("FileLock", fields: [lockedBy], references: [id], onDelete: SetNull)
+  permissions  FilePermission[]
+  contents     DocumentContent[]
+
+  @@map("files")
+}
+
+model FilePermission {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileId     String   @map("file_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  permission String
+  grantedBy  String?  @map("granted_by") @db.Uuid
+  grantedAt  DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+
+  file    File  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user    User  @relation("PermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantor User? @relation("PermissionGrantor", fields: [grantedBy], references: [id], onDelete: SetNull)
+
+  @@unique([fileId, userId])
+  @@map("file_permissions")
+}
+
+model DocumentContent {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileId     String   @map("file_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@map("document_contents")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  teamId       String?  @map("team_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id") @db.Uuid
+  details      Json?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model Message {
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  userEmail String   @map("user_email")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  team Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("messages")
+}
