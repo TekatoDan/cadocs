@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { AuthCodeRedirect } from "@/components/auth/AuthCodeRedirect";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 const Dashboard = dynamic(
@@ -10,8 +11,11 @@ const Dashboard = dynamic(
 
 export default function Home() {
   return (
-    <ProtectedRoute>
-      <Dashboard />
-    </ProtectedRoute>
+    <>
+      <AuthCodeRedirect />
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    </>
   );
 }

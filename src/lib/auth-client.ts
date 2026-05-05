@@ -17,6 +17,51 @@ export type EmailAuthResult =
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function isLocalhostOrigin(value: string) {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+export function getAppOrigin() {
+  const envOrigin = process.env.NEXT_PUBLIC_APP_URL
+    ? trimTrailingSlash(process.env.NEXT_PUBLIC_APP_URL)
+    : "";
+
+  if (typeof window !== "undefined") {
+    const browserOrigin = window.location.origin;
+
+    if (envOrigin && !isLocalhostOrigin(envOrigin)) {
+      return envOrigin;
+    }
+
+    return browserOrigin;
+  }
+
+  if (envOrigin) {
+    return envOrigin;
+  }
+
+  return "";
+}
+
+export function getAuthCallbackUrl(next?: string) {
+  const callbackUrl = new URL("/auth/callback", getAppOrigin());
+
+  if (next?.startsWith("/")) {
+    callbackUrl.searchParams.set("next", next);
+  }
+
+  return callbackUrl.toString();
+}
+
 export function isValidEmail(email: string) {
   return EMAIL_PATTERN.test(email.trim());
 }

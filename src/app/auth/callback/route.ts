@@ -1,6 +1,47 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function isLocalhostOrigin(value: string) {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function getSafeOrigin(request: Request, requestOrigin: string) {
+  const headers = request.headers;
+  const forwardedHost = headers.get("x-forwarded-host");
+  const forwardedProto = headers.get("x-forwarded-proto");
+  const forwardedOrigin = forwardedHost
+    ? `${forwardedProto ?? "https"}://${forwardedHost}`
+    : "";
+  const vercelOrigin = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "";
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL
+    ? trimTrailingSlash(process.env.NEXT_PUBLIC_APP_URL)
+    : "";
+
+  for (const candidate of [
+    forwardedOrigin,
+    requestOrigin,
+    vercelOrigin,
+    appOrigin,
+  ]) {
+    if (candidate && !isLocalhostOrigin(candidate)) {
+      return trimTrailingSlash(candidate);
+    }
+  }
+
+  return trimTrailingSlash(requestOrigin);
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -10,13 +51,7 @@ export async function GET(request: Request) {
   const oauthError = searchParams.get("error");
   const oauthErrorDescription = searchParams.get("error_description");
 
-  const headers = request.headers;
-  const forwardedHost = headers.get("x-forwarded-host");
-  const forwardedProto = headers.get("x-forwarded-proto");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const safeOrigin = forwardedHost
-    ? `${forwardedProto ?? "https"}://${forwardedHost}`
-    : appUrl ?? origin;
+  const safeOrigin = getSafeOrigin(request, origin);
 
   const safeNext = next.startsWith("/") ? next : "/";
   const supabase = await createClient();

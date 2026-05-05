@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  getAuthCallbackUrl,
   getReadableAuthError,
   isValidEmail,
   MIN_PASSWORD_LENGTH,
@@ -151,7 +152,7 @@ export default function LoginPage() {
     setLoadingAction("email");
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = getAuthCallbackUrl();
       const result = isSignUp
         ? await signUpWithEmail(supabase, normalizedEmail, password, redirectTo)
         : await signInWithEmail(supabase, normalizedEmail, password);
@@ -183,7 +184,7 @@ export default function LoginPage() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: getAuthCallbackUrl(),
         },
       });
 
@@ -210,7 +211,7 @@ export default function LoginPage() {
       const resetEmail = await sendPasswordResetEmail(
         supabase,
         normalizedEmail,
-        `${window.location.origin}/auth/callback?next=/reset-password`
+        getAuthCallbackUrl("/reset-password")
       );
       setMessage(`Password reset link sent to ${resetEmail}.`);
     } catch (err) {
