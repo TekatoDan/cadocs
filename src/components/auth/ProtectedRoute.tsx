@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDefaultTeam, useTeamRole } from "@/hooks/use-teams";
@@ -14,11 +14,21 @@ export default function ProtectedRoute({
 }) {
   const router = useRouter();
   const { session, user, loading } = useAuth();
-  const { data: team, isLoading: teamLoading } = useDefaultTeam(user?.id);
-  const { data: role, isLoading: roleLoading } = useTeamRole(
-    team?.id ?? null,
-    user?.id
-  );
+  const [showSlowState, setShowSlowState] = useState(false);
+  const {
+    data: team,
+    isLoading: teamLoading,
+    isError: teamIsError,
+    error: teamError,
+    refetch: refetchTeam,
+  } = useDefaultTeam(user?.id);
+  const {
+    data: role,
+    isLoading: roleLoading,
+    isError: roleIsError,
+    error: roleError,
+    refetch: refetchRole,
+  } = useTeamRole(team?.id ?? null, user?.id);
 
   const supabase = createClient();
 
@@ -28,7 +38,49 @@ export default function ProtectedRoute({
     }
   }, [loading, session, router]);
 
-  if (loading || (session && (teamLoading || roleLoading))) {
+  const isResolvingAccess = loading || Boolean(session && (teamLoading || roleLoading));
+  const accessError = teamIsError ? teamError : roleIsError ? roleError : null;
+
+  useEffect(() => {
+    if (!isResolvingAccess) {
+      setShowSlowState(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setShowSlowState(true);
+    }, 12000);
+
+    return () => window.clearTimeout(timeout);
+  }, [isResolvingAccess]);
+
+  if (accessError) {
+    return (
+      <AccessProblem
+        title="We could not finish account setup"
+        message="Your login worked, but CADOCS could not load your team access. This is usually a database environment variable or table setup issue."
+        detail={formatError(accessError)}
+        onRetry={() => {
+          void refetchTeam();
+          void refetchRole();
+        }}
+        onSignOut={() => void supabase.auth.signOut()}
+      />
+    );
+  }
+
+  if (isResolvingAccess && showSlowState) {
+    return (
+      <AccessProblem
+        title="Still loading your account"
+        message="CADOCS is signed in, but the dashboard setup request is taking too long. Check that Vercel has the same DATABASE_URL password and Supabase project ref as your local .env."
+        onRetry={() => window.location.reload()}
+        onSignOut={() => void supabase.auth.signOut()}
+      />
+    );
+  }
+
+  if (isResolvingAccess) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-navy-950">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
@@ -113,4 +165,63 @@ export default function ProtectedRoute({
   }
 
   return <>{children}</>;
+}
+
+function formatError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown setup error";
+}
+
+function AccessProblem({
+  title,
+  message,
+  detail,
+  onRetry,
+  onSignOut,
+}: {
+  title: string;
+  message: string;
+  detail?: string;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-navy-950 px-4">
+      <div className="w-full max-w-md space-y-6 rounded-2xl bg-white p-8 text-center shadow-xl ring-1 ring-slate-200 dark:bg-navy-900 dark:ring-slate-800">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800/40">
+          <AlertTriangle className="h-7 w-7" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-slate-950 dark:text-white">
+            {title}
+          </h2>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+            {message}
+          </p>
+        </div>
+        {detail ? (
+          <div className="rounded-lg bg-slate-100 px-3 py-2 text-left text-xs text-slate-700 dark:bg-navy-950 dark:text-slate-300">
+            {detail}
+          </div>
+        ) : null}
+        <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700"
+          >
+            Try Again
+          </button>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-navy-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
