@@ -181,14 +181,29 @@ export default function LoginPage() {
     setLoadingAction("google");
 
     try {
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      const redirectTo = getAuthCallbackUrl();
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: getAuthCallbackUrl(),
+          redirectTo,
+          skipBrowserRedirect: true,
         },
       });
 
       if (oauthError) throw oauthError;
+
+      if (!data.url) {
+        throw new Error("Google login did not return a redirect URL.");
+      }
+
+      const oauthUrl = new URL(data.url);
+      const returnedRedirectTo = oauthUrl.searchParams.get("redirect_to");
+
+      if (returnedRedirectTo?.includes("localhost")) {
+        oauthUrl.searchParams.set("redirect_to", redirectTo);
+      }
+
+      window.location.assign(oauthUrl.toString());
     } catch (err) {
       setError(getReadableAuthError(err));
       setLoadingAction(null);
