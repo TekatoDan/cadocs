@@ -3,6 +3,23 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const isRootPath = request.nextUrl.pathname === '/';
+  const hasRootCallbackParams =
+    request.nextUrl.searchParams.has('code') ||
+    request.nextUrl.searchParams.has('token_hash');
+  const hasRootAuthError = request.nextUrl.searchParams.has('error');
+
+  if (isRootPath && hasRootCallbackParams) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/callback';
+    return NextResponse.redirect(url);
+  }
+
+  if (isRootPath && hasRootAuthError) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
