@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FolderPlus, Upload } from "lucide-react";
+import { ArrowDownUp, ArrowUp, ArrowDown, FolderPlus, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FolderRow } from "@/components/dashboard/FolderRow";
 import { FileRow } from "@/components/dashboard/FileRow";
@@ -42,11 +42,19 @@ interface FileTableProps {
   onDrop: (e: React.DragEvent, folderId: string) => void;
   onCreateFolder: () => void;
   onTriggerUpload: () => void;
+  sortBy: "name" | "owner" | "lastModified" | "size";
+  sortDirection: "asc" | "desc";
+  onSortChange: (column: "name" | "owner" | "lastModified" | "size") => void;
+  selectedIds: string[];
+  onSelectedIdsChange: (ids: string[]) => void;
 }
 
 function SkeletonRow({ columns }: { columns: ColumnConfig }) {
   return (
     <tr className="border-b border-slate-100 dark:border-navy-800">
+      <td className="px-4 py-3">
+        <div className="h-4 w-4 animate-pulse rounded bg-slate-200 dark:bg-navy-700" />
+      </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 animate-pulse rounded-lg bg-slate-200 dark:bg-navy-700" />
@@ -104,28 +112,85 @@ export function FileTable({
   onDrop,
   onCreateFolder,
   onTriggerUpload,
+  sortBy,
+  sortDirection,
+  onSortChange,
+  selectedIds,
+  onSelectedIdsChange,
 }: FileTableProps) {
+  const allIds = React.useMemo(
+    () => [...folders.map((folder) => folder.id), ...files.map((file) => file.id)],
+    [folders, files]
+  );
+  const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelection = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectedIdsChange(Array.from(new Set([...selectedIds, id])));
+      return;
+    }
+    onSelectedIdsChange(selectedIds.filter((item) => item !== id));
+  };
+
+  const getSortIcon = (column: "name" | "owner" | "lastModified" | "size") => {
+    if (sortBy !== column) return <ArrowDownUp className="h-3.5 w-3.5" />;
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5" />
+    );
+  };
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-navy-700 dark:bg-navy-900">
+    <div className="overflow-hidden app-surface">
       <table className="w-full">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 dark:border-navy-700 dark:bg-navy-800/50">
+            <th className="px-4 py-3 text-left">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => onSelectedIdsChange(e.target.checked ? allIds : [])}
+                aria-label="Select all rows"
+                className="app-focus-ring h-4 w-4 rounded border-slate-300 text-indigo-600"
+              />
+            </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Name
+              <button
+                onClick={() => onSortChange("name")}
+                className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+              >
+                Name {getSortIcon("name")}
+              </button>
             </th>
             {columns.owner && (
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Owner
+                <button
+                  onClick={() => onSortChange("owner")}
+                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                >
+                  Owner {getSortIcon("owner")}
+                </button>
               </th>
             )}
             {columns.lastModified && (
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Last Modified
+                <button
+                  onClick={() => onSortChange("lastModified")}
+                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                >
+                  Last Modified {getSortIcon("lastModified")}
+                </button>
               </th>
             )}
             {columns.size && (
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Size
+                <button
+                  onClick={() => onSortChange("size")}
+                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                >
+                  Size {getSortIcon("size")}
+                </button>
               </th>
             )}
             <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -146,7 +211,7 @@ export function FileTable({
             <tr>
               <td
                 colSpan={
-                  1 +
+                  2 +
                   (columns.owner ? 1 : 0) +
                   (columns.lastModified ? 1 : 0) +
                   (columns.size ? 1 : 0) +
@@ -216,6 +281,8 @@ export function FileTable({
                   onDragOver={onDragOver}
                   onDragLeave={onDragLeave}
                   onDrop={onDrop}
+                  isSelected={selectedIds.includes(folder.id)}
+                  onSelect={toggleSelection}
                 />
               ))}
               {files.map((file) => (
@@ -237,6 +304,8 @@ export function FileTable({
                   onStar={onStarFile}
                   onRestore={onRestoreFile}
                   onDragStart={onDragStart}
+                  isSelected={selectedIds.includes(file.id)}
+                  onSelect={toggleSelection}
                 />
               ))}
             </>

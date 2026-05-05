@@ -23,6 +23,8 @@ interface FolderRowProps {
   onDragOver: (e: React.DragEvent, folderId: string) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, folderId: string) => void;
+  isSelected: boolean;
+  onSelect: (id: string, checked: boolean) => void;
 }
 
 function getOwnerName(
@@ -71,6 +73,8 @@ export function FolderRow({
   onDragOver,
   onDragLeave,
   onDrop,
+  isSelected,
+  onSelect,
 }: FolderRowProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -91,6 +95,18 @@ export function FolderRow({
       )}
       onClick={() => onNavigate(folder)}
     >
+      {/* Select */}
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onSelect(folder.id, e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select folder ${folder.name}`}
+          className="app-focus-ring h-4 w-4 rounded border-slate-300 text-indigo-600"
+        />
+      </td>
+
       {/* Name */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
@@ -129,7 +145,7 @@ export function FolderRow({
         <div
           className={cn(
             "flex items-center justify-end gap-1 transition-opacity",
-            isHovered ? "opacity-100" : "opacity-0"
+            isHovered ? "opacity-100" : "opacity-70"
           )}
           onClick={(e) => e.stopPropagation()}
         >

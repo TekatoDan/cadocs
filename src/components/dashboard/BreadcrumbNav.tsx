@@ -75,7 +75,7 @@ export function BreadcrumbNav({
   const isRootActive = segments.length === 0;
 
   return (
-    <div className="flex items-center rounded-full bg-white/50 px-3 py-1.5 dark:bg-navy-800/50">
+    <div className="app-surface-soft flex items-center rounded-2xl px-3 py-2">
       <button
         type="button"
         onClick={() => onNavigateUp(-1)}
@@ -95,6 +95,7 @@ export function BreadcrumbNav({
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
           "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+          "app-focus-ring",
           dragOverFolderId === null &&
             draggedItem &&
             "ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
@@ -113,6 +114,7 @@ export function BreadcrumbNav({
             onClick={handleRootClick}
             className={cn(
               "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+              "app-focus-ring",
               isRootActive
                 ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
@@ -146,6 +148,7 @@ export function BreadcrumbNav({
             }
             className={cn(
               "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+              "app-focus-ring",
               isRootActive
                 ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
@@ -187,6 +190,7 @@ export function BreadcrumbNav({
               }
               className={cn(
                 "max-w-[150px] truncate rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                "app-focus-ring",
                 isLast
                   ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",

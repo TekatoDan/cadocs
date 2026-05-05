@@ -36,6 +36,8 @@ interface FileRowProps {
   onStar: (fileId: string) => void;
   onRestore: (fileId: string) => void;
   onDragStart: (e: React.DragEvent, type: "file", id: string) => void;
+  isSelected: boolean;
+  onSelect: (id: string, checked: boolean) => void;
 }
 
 function getOwnerName(
@@ -107,6 +109,8 @@ export function FileRow({
   onStar,
   onRestore,
   onDragStart,
+  isSelected,
+  onSelect,
 }: FileRowProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [editingName, setEditingName] = useState(file.name);
@@ -162,6 +166,18 @@ export function FileRow({
       )}
       onClick={() => !isRenaming && onPreview(file)}
     >
+      {/* Select */}
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onSelect(file.id, e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select file ${file.name}`}
+          className="app-focus-ring h-4 w-4 rounded border-slate-300 text-indigo-600"
+        />
+      </td>
+
       {/* Name */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
@@ -227,7 +243,7 @@ export function FileRow({
         <div
           className={cn(
             "flex items-center justify-end gap-1 transition-opacity",
-            isHovered ? "opacity-100" : "opacity-0"
+            isHovered ? "opacity-100" : "opacity-70"
           )}
           onClick={(e) => e.stopPropagation()}
         >

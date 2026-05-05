@@ -27,6 +27,25 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("error");
+    const authErrorDescription = params.get("error_description");
+
+    if (!authError) return;
+
+    if (authErrorDescription) {
+      setError(authErrorDescription.replace(/\+/g, " "));
+      return;
+    }
+
+    const fallbackMessage =
+      authError === "access_denied"
+        ? "Authentication was cancelled or denied."
+        : "Authentication failed. Please try again.";
+    setError(fallbackMessage);
+  }, []);
+
   const getPasswordStrength = (pass: string) => {
     let score = 0;
     if (!pass) return 0;

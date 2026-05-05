@@ -115,7 +115,13 @@ export default function Header({
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addRecentSearch(searchQuery);
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < recentSearches.length) {
+        const selected = recentSearches[activeSuggestionIndex];
+        onSearchChange(selected);
+        addRecentSearch(selected);
+      } else {
+        addRecentSearch(searchQuery);
+      }
       setShowSearchSuggestions(false);
       searchInputRef.current?.blur();
     } else if (e.key === "Escape") {
@@ -138,6 +144,20 @@ export default function Header({
     setShowSearchSuggestions(false);
   };
 
+  const activeFilterEntries = [
+    searchFilters.fileType && searchFilters.fileType !== "all"
+      ? `Type: ${searchFilters.fileType}`
+      : null,
+    searchFilters.dateModified && searchFilters.dateModified !== "any"
+      ? `Date: ${searchFilters.dateModified}`
+      : null,
+    searchFilters.owner && searchFilters.owner !== "anyone" ? "Owner: custom" : null,
+    searchFilters.fileSize && searchFilters.fileSize !== "any"
+      ? `Size: ${searchFilters.fileSize}`
+      : null,
+    searchFilters.tags ? `Tag: ${searchFilters.tags}` : null,
+  ].filter(Boolean) as string[];
+
   // When arrow keys select a suggestion, apply it
   useEffect(() => {
     if (activeSuggestionIndex >= 0 && activeSuggestionIndex < recentSearches.length) {
@@ -146,7 +166,7 @@ export default function Header({
   }, [activeSuggestionIndex, recentSearches]);
 
   return (
-    <header className="sticky top-0 z-10 flex h-20 items-center justify-between border-b border-slate-200/50 bg-white/80 px-4 backdrop-blur-xl dark:border-navy-800/50 dark:bg-navy-950/80 sm:px-6">
+    <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between border-b border-slate-200/50 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-navy-800/50 dark:bg-navy-950/80 sm:px-6">
       {/* Left side */}
       <div className="flex items-center gap-3">
         <button
@@ -184,7 +204,7 @@ export default function Header({
                 setActiveSuggestionIndex(-1);
               }}
               onKeyDown={handleSearchKeyDown}
-              className="w-48 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-10 text-sm text-slate-900 transition-all duration-200 placeholder:text-slate-400 focus:w-72 focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-600 dark:focus:bg-navy-900 dark:focus:ring-blue-900/30"
+              className="app-focus-ring w-48 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-10 text-sm text-slate-900 transition-all duration-200 placeholder:text-slate-400 focus:w-72 focus:border-blue-300 focus:bg-white dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-600 dark:focus:bg-navy-900 dark:focus:ring-blue-900/30"
             />
             {/* Filter button */}
             <div ref={filterDropdownRef} className="absolute right-2">
@@ -193,7 +213,9 @@ export default function Header({
                 className={`rounded-lg p-1 transition-colors ${
                   searchFilters.fileType ||
                   searchFilters.dateModified ||
-                  searchFilters.owner
+                  searchFilters.owner ||
+                  searchFilters.fileSize ||
+                  searchFilters.tags
                     ? "text-blue-600 dark:text-blue-400"
                     : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
@@ -278,7 +300,61 @@ export default function Header({
                           ))}
                       </select>
                     </div>
+
+                    {/* File size */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                        File Size
+                      </label>
+                      <select
+                        value={searchFilters.fileSize || "any"}
+                        onChange={(e) =>
+                          onSearchFiltersChange({
+                            ...searchFilters,
+                            fileSize: e.target.value || "any",
+                          })
+                        }
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 dark:border-navy-700 dark:bg-navy-800 dark:text-white"
+                      >
+                        <option value="any">Any size</option>
+                        <option value="small">Below 1 MB</option>
+                        <option value="medium">1 - 10 MB</option>
+                        <option value="large">Above 10 MB</option>
+                      </select>
+                    </div>
+
+                    {/* Tags */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Tag
+                      </label>
+                      <input
+                        value={searchFilters.tags || ""}
+                        onChange={(e) =>
+                          onSearchFiltersChange({
+                            ...searchFilters,
+                            tags: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. invoice"
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 dark:border-navy-700 dark:bg-navy-800 dark:text-white"
+                      />
+                    </div>
                   </div>
+                  <button
+                    onClick={() =>
+                      onSearchFiltersChange({
+                        fileType: "all",
+                        dateModified: "any",
+                        owner: "anyone",
+                        fileSize: "any",
+                        tags: "",
+                      })
+                    }
+                    className="mt-3 app-muted-button w-full py-1.5 text-xs"
+                  >
+                    Clear all filters
+                  </button>
                 </div>
               )}
             </div>
@@ -307,6 +383,19 @@ export default function Header({
             </div>
           )}
         </div>
+
+        {activeFilterEntries.length > 0 && (
+          <div className="hidden lg:flex items-center gap-1.5">
+            {activeFilterEntries.slice(0, 3).map((entry) => (
+              <span
+                key={entry}
+                className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:border-navy-700 dark:bg-navy-800 dark:text-slate-300"
+              >
+                {entry}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Theme toggle */}
         <button

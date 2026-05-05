@@ -14,7 +14,7 @@ export async function searchDocuments(
   const hasFilters =
     filters &&
     Object.values(filters).some(
-      (v) => v !== "all" && v !== "any" && v !== "anyone"
+      (v) => v !== "all" && v !== "any" && v !== "anyone" && v !== ""
     );
 
   if (!hasQuery && !hasFilters) return [];
@@ -65,6 +65,20 @@ export async function searchDocuments(
 
   if (filters?.owner && filters.owner !== "anyone") {
     extraFilters.createdBy = filters.owner;
+  }
+
+  if (filters?.fileSize && filters.fileSize !== "any") {
+    if (filters.fileSize === "small") {
+      extraFilters.sizeBytes = { lt: 1 * 1024 * 1024 };
+    } else if (filters.fileSize === "medium") {
+      extraFilters.sizeBytes = { gte: 1 * 1024 * 1024, lte: 10 * 1024 * 1024 };
+    } else if (filters.fileSize === "large") {
+      extraFilters.sizeBytes = { gt: 10 * 1024 * 1024 };
+    }
+  }
+
+  if (filters?.tags) {
+    extraFilters.name = { contains: filters.tags, mode: "insensitive" };
   }
 
   const results: SearchResult[] = [];

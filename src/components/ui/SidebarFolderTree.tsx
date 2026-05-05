@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Folder, Loader2 } from "lucide-react";
 import { getFolders } from "@/app/actions/storage";
 import type { FolderRecord } from "@/lib/types";
@@ -17,6 +17,8 @@ interface SidebarFolderTreeProps {
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, folderId: string) => void;
   dragOverFolderId?: string | null;
+  onShowNewFolder?: () => void;
+  onShowUpload?: () => void;
 }
 
 export function SidebarFolderTree({
@@ -31,10 +33,16 @@ export function SidebarFolderTree({
   onDragLeave,
   onDrop,
   dragOverFolderId,
+  onShowNewFolder,
+  onShowUpload,
 }: SidebarFolderTreeProps) {
   const [folders, setFolders] = useState<FolderRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [contextMenu, setContextMenu] = useState<
+    null | { x: number; y: number; folderName: string; folder: FolderRecord; folderPath: FolderRecord[] }
+  >(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +66,29 @@ export function SidebarFolderTree({
       isMounted = false;
     };
   }, [teamId, parentId, refreshTrigger]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (contextMenuRef.current && !contextMenuRef.current.contains(target)) {
+        setContextMenu(null);
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu]);
 
   if (isLoading && !hasLoaded) {
     return (
@@ -89,8 +120,51 @@ export function SidebarFolderTree({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           dragOverFolderId={dragOverFolderId}
+          onShowNewFolder={onShowNewFolder}
+          onShowUpload={onShowUpload}
+          onOpenContextMenu={(x, y, folderName, folder, folderPath) =>
+            setContextMenu({ x, y, folderName, folder, folderPath })
+          }
         />
       ))}
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          style={{ position: "fixed", left: contextMenu.x, top: contextMenu.y, zIndex: 200 }}
+          className="min-w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-navy-800 dark:bg-navy-950"
+          role="menu"
+        >
+          {onShowNewFolder && (
+            <button
+              onClick={() => {
+                if (contextMenu) onNavigate(contextMenu.folder, contextMenu.folderPath);
+                setContextMenu(null);
+                onShowNewFolder();
+              }}
+              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy-900"
+              role="menuitem"
+            >
+              New Folder
+            </button>
+          )}
+          {onShowUpload && (
+            <button
+              onClick={() => {
+                if (contextMenu) onNavigate(contextMenu.folder, contextMenu.folderPath);
+                setContextMenu(null);
+                onShowUpload();
+              }}
+              className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy-900 ${
+                onShowNewFolder ? "mt-1" : ""
+              }`}
+              role="menuitem"
+            >
+              New File
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -107,6 +181,15 @@ interface FolderItemProps {
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, folderId: string) => void;
   dragOverFolderId?: string | null;
+  onShowNewFolder?: () => void;
+  onShowUpload?: () => void;
+  onOpenContextMenu: (
+    x: number,
+    y: number,
+    folderName: string,
+    folder: FolderRecord,
+    folderPath: FolderRecord[]
+  ) => void;
 }
 
 const FolderItem: React.FC<FolderItemProps> = ({
@@ -121,6 +204,9 @@ const FolderItem: React.FC<FolderItemProps> = ({
   onDragLeave,
   onDrop,
   dragOverFolderId,
+  onShowNewFolder,
+  onShowUpload,
+  onOpenContextMenu,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isSelected = currentFolderId === folder.id;
@@ -136,6 +222,18 @@ const FolderItem: React.FC<FolderItemProps> = ({
         onDragOver={(e) => onDragOver?.(e, folder.id)}
         onDragLeave={onDragLeave}
         onDrop={(e) => onDrop?.(e, folder.id)}
+        onContextMenu={(e) => {
+          if (!onShowNewFolder && !onShowUpload) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Ensure the selected folder is the correct parent for create/upload actions.
+          onNavigate(folder, currentPath);
+
+          const x = Math.min(window.innerWidth - 240, Math.max(0, e.clientX));
+          const y = Math.min(window.innerHeight - 160, Math.max(0, e.clientY));
+          onOpenContextMenu(x, y, folder.name, folder, currentPath);
+        }}
       >
         <button
           onClick={(e) => {
@@ -174,6 +272,8 @@ const FolderItem: React.FC<FolderItemProps> = ({
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           dragOverFolderId={dragOverFolderId}
+          onShowNewFolder={onShowNewFolder}
+          onShowUpload={onShowUpload}
         />
       )}
     </div>

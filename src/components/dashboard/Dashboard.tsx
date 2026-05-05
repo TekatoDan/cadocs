@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDefaultTeam, useTeamRole, useTeamMembers } from "@/hooks/use-teams";
 import { useFiles, useRecentFiles, useStarredFiles, useMoveDocument } from "@/hooks/use-files";
@@ -24,6 +24,7 @@ import { SearchResults } from "./SearchResults";
 import FilePreviewModal from "./FilePreviewModal";
 import { NewFolderModal } from "./NewFolderModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { PersonalInfoModal } from "./PersonalInfoModal";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { getSignedDownloadUrl } from "@/app/actions/storage";
 import { useCreateFolder, useDeleteFolder, useArchiveFolderMutation } from "@/hooks/use-folders";
@@ -49,8 +50,9 @@ export default function Dashboard() {
 
   // UI state
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showUploadPanel, setShowUploadPanel] = useState(true);
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [showPersonalInfoModal, setShowPersonalInfoModal] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -65,6 +67,8 @@ export default function Dashboard() {
     fileType: "all",
     dateModified: "any",
     owner: "anyone",
+    tags: "",
+    fileSize: "any",
   });
 
   // Stars
@@ -78,12 +82,19 @@ export default function Dashboard() {
     localStorage.setItem("starredItems", JSON.stringify(starredItems));
   }, [starredItems]);
 
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [viewMode, currentFolderId, searchQuery, searchFilters]);
+
   // Columns
   const [columns, setColumns] = useState<ColumnConfig>({
     owner: true,
     lastModified: true,
     size: true,
   });
+  const [sortBy, setSortBy] = useState<"name" | "owner" | "lastModified" | "size">("lastModified");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Drag and drop
   const [draggedItem, setDraggedItem] = useState<{ type: "file" | "folder"; id: string } | null>(null);
@@ -130,7 +141,9 @@ export default function Dashboard() {
 
   const isSearchActive =
     searchQuery.length >= 3 ||
-    Object.values(searchFilters).some((v) => v !== "all" && v !== "any" && v !== "anyone");
+    Object.values(searchFilters).some(
+      (v) => v !== "all" && v !== "any" && v !== "anyone" && v !== ""
+    );
 
   // Mutations
   const createFolderMutation = useCreateFolder();
@@ -152,6 +165,54 @@ export default function Dashboard() {
   // Computed display data
   const displayFiles = viewMode === "recent" ? recentFiles : viewMode === "starred" ? starredFilesList : viewMode === "archive" ? archiveFiles : files;
   const displayFolders = viewMode === "starred" ? starredFoldersList : viewMode === "archive" ? archiveFolders : viewMode === "recent" ? [] : folders;
+  const sortedFiles = useMemo(() => {
+    const arr = [...displayFiles];
+    arr.sort((a, b) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      if (sortBy === "name") return a.name.localeCompare(b.name) * direction;
+      if (sortBy === "size") return (a.size_bytes - b.size_bytes) * direction;
+      if (sortBy === "lastModified") {
+        return (
+          (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * direction
+        );
+      }
+      const ownerA =
+        teamMembers.find((m) => m.user_id === a.created_by)?.users?.full_name ??
+        teamMembers.find((m) => m.user_id === a.created_by)?.users?.email ??
+        "";
+      const ownerB =
+        teamMembers.find((m) => m.user_id === b.created_by)?.users?.full_name ??
+        teamMembers.find((m) => m.user_id === b.created_by)?.users?.email ??
+        "";
+      return ownerA.localeCompare(ownerB) * direction;
+    });
+    return arr;
+  }, [displayFiles, sortBy, sortDirection, teamMembers]);
+  const sortedFolders = useMemo(() => {
+    const arr = [...displayFolders];
+    arr.sort((a, b) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      if (sortBy === "name") return a.name.localeCompare(b.name) * direction;
+      if (sortBy === "lastModified") {
+        return (
+          (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * direction
+        );
+      }
+      if (sortBy === "owner") {
+        const ownerA =
+          teamMembers.find((m) => m.user_id === a.created_by)?.users?.full_name ??
+          teamMembers.find((m) => m.user_id === a.created_by)?.users?.email ??
+          "";
+        const ownerB =
+          teamMembers.find((m) => m.user_id === b.created_by)?.users?.full_name ??
+          teamMembers.find((m) => m.user_id === b.created_by)?.users?.email ??
+          "";
+        return ownerA.localeCompare(ownerB) * direction;
+      }
+      return 0;
+    });
+    return arr;
+  }, [displayFolders, sortBy, sortDirection, teamMembers]);
 
   const title = showAdminPanel
     ? "Team Management"
@@ -162,6 +223,7 @@ export default function Dashboard() {
         : viewMode === "starred"
           ? "Starred"
           : "My Files";
+  const activeSection = showAdminPanel ? "admin" : viewMode;
 
   // Navigation handlers
   const navigateToRoot = useCallback(() => {
@@ -403,6 +465,12 @@ export default function Dashboard() {
     [restoreFolderMutation]
   );
 
+  const quickAccessFiles = useMemo(() => {
+    if (viewMode === "recent") return recentFiles.slice(0, 5);
+    if (viewMode === "starred") return starredFilesList.slice(0, 5);
+    return files.slice(0, 5);
+  }, [files, recentFiles, starredFilesList, viewMode]);
+
   // Loading state
   if (teamLoading) {
     return (
@@ -440,7 +508,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans overflow-hidden">
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
@@ -479,9 +547,11 @@ export default function Dashboard() {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onMobileClose={() => setIsMobileMenuOpen(false)}
         onSignOut={signOut}
+        onShowPersonalInfo={() => setShowPersonalInfoModal(true)}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        activeSection={activeSection}
       />
 
       {/* Main Content */}
@@ -500,7 +570,7 @@ export default function Dashboard() {
           onMobileMenuOpen={() => setIsMobileMenuOpen(true)}
         />
 
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50 dark:bg-transparent">
+        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-transparent">
           {showAdminPanel ? (
             <AdminPanel
               teamId={teamId!}
@@ -508,7 +578,28 @@ export default function Dashboard() {
               currentUserId={user?.id}
             />
           ) : (
-            <div className="max-w-7xl mx-auto animate-fade-up">
+            <div className="max-w-7xl mx-auto animate-fade-up space-y-4">
+              <section className="app-surface-soft px-4 py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Quick Access
+                  </span>
+                  {quickAccessFiles.length === 0 ? (
+                    <span className="text-sm text-slate-500 dark:text-slate-400">No files yet.</span>
+                  ) : (
+                    quickAccessFiles.map((file) => (
+                      <button
+                        key={file.id}
+                        className="app-muted-button py-1.5 text-xs"
+                        onClick={() => setPreviewFile(file)}
+                      >
+                        {file.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </section>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <BreadcrumbNav
                   folderPath={folderPath}
@@ -537,8 +628,8 @@ export default function Dashboard() {
                 />
               ) : (
                 <FileTable
-                  files={displayFiles}
-                  folders={displayFolders}
+                  files={sortedFiles}
+                  folders={sortedFolders}
                   isLoading={isLoading}
                   isEmpty={displayFiles.length === 0 && displayFolders.length === 0}
                   canEdit={canEdit}
@@ -565,6 +656,18 @@ export default function Dashboard() {
                   onDrop={handleDrop}
                   onCreateFolder={() => setShowNewFolderModal(true)}
                   onTriggerUpload={() => setShowUploadPanel(true)}
+                  sortBy={sortBy}
+                  sortDirection={sortDirection}
+                  onSortChange={(column) => {
+                    if (sortBy === column) {
+                      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+                      return;
+                    }
+                    setSortBy(column);
+                    setSortDirection(column === "name" || column === "owner" ? "asc" : "desc");
+                  }}
+                  selectedIds={selectedIds}
+                  onSelectedIdsChange={setSelectedIds}
                 />
               )}
             </div>
@@ -572,13 +675,23 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Upload Panel */}
+      {/* Upload Modal / Drawer */}
       {showUploadPanel && canEdit && !isSpecialView && teamId && (
-        <UploadPanel
-          teamId={teamId}
-          currentFolderId={currentFolderId}
-          onClose={() => setShowUploadPanel(false)}
-        />
+        <div className="fixed inset-0 z-[70] flex justify-end bg-slate-900/50 backdrop-blur-sm">
+          <button
+            aria-label="Close upload drawer backdrop"
+            className="h-full w-full cursor-default"
+            onClick={() => setShowUploadPanel(false)}
+          />
+          <div className="relative h-full w-full max-w-xl app-surface animate-slide-in-right rounded-none md:rounded-l-2xl">
+            <UploadPanel
+              teamId={teamId}
+              currentFolderId={currentFolderId}
+              onClose={() => setShowUploadPanel(false)}
+              variant="drawer"
+            />
+          </div>
+        </div>
       )}
 
       {/* Modals */}
@@ -611,6 +724,11 @@ export default function Dashboard() {
         file={previewFile}
         onClose={() => setPreviewFile(null)}
         onDownload={handleDownload}
+      />
+
+      <PersonalInfoModal
+        open={showPersonalInfoModal}
+        onClose={() => setShowPersonalInfoModal(false)}
       />
     </div>
   );

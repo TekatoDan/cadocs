@@ -41,6 +41,8 @@ export interface SearchFilters {
   fileType?: string;
   dateModified?: string;
   owner?: string;
+  tags?: string;
+  fileSize?: string;
 }
 
 export interface ChatMessage {

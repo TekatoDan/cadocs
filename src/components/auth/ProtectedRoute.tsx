@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDefaultTeam, useTeamRole } from "@/hooks/use-teams";
 import { Loader2, Lock, AlertTriangle, Mail } from "lucide-react";
@@ -10,6 +12,7 @@ export default function ProtectedRoute({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const { session, user, loading } = useAuth();
   const { data: team, isLoading: teamLoading } = useDefaultTeam(user?.id);
   const { data: role, isLoading: roleLoading } = useTeamRole(
@@ -19,6 +22,12 @@ export default function ProtectedRoute({
 
   const supabase = createClient();
 
+  useEffect(() => {
+    if (!loading && !session) {
+      router.replace("/login");
+    }
+  }, [loading, session, router]);
+
   if (loading || (session && (teamLoading || roleLoading))) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-navy-950">
@@ -27,7 +36,13 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!session) return null; // Middleware handles redirect
+  if (!session) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-navy-950">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
+      </div>
+    );
+  }
 
   if (role === "pending" || role === "viewer") {
     return (

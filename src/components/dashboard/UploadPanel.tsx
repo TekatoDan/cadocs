@@ -10,6 +10,7 @@ interface UploadPanelProps {
   teamId: string;
   currentFolderId: string | null;
   onClose: () => void;
+  variant?: "panel" | "drawer";
 }
 
 const ACCEPTED_FILE_TYPES = ".pdf,.txt,.md,.csv,.png,.jpg,.jpeg";
@@ -18,59 +19,73 @@ export function UploadPanel({
   teamId,
   currentFolderId,
   onClose,
+  variant = "panel",
 }: UploadPanelProps) {
   const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState("");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isPrivateUpload, setIsPrivateUpload] = useState(false);
+  const [queue, setQueue] = useState<
+    { id: string; name: string; status: "queued" | "extracting" | "uploading" | "done" | "error" }[]
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadDocument();
 
   const handleUpload = useCallback(
-    async (file: File) => {
+    async (files: File[]) => {
       setUploading(true);
-      setUploadStatus("Preparing upload...");
+      const initialQueue = files.map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}`,
+        name: file.name,
+        status: "queued" as const,
+      }));
+      setQueue(initialQueue);
 
-      try {
-        let extractedText: string | undefined;
-
+      for (const file of files) {
+        const queueId = `${file.name}-${file.size}-${file.lastModified}`;
         try {
-          setUploadStatus("Extracting text from file...");
-          extractedText = await extractTextFromFile(file);
+          let extractedText: string | undefined;
+
+          setQueue((prev) =>
+            prev.map((item) =>
+              item.id === queueId ? { ...item, status: "extracting" } : item
+            )
+          );
+          try {
+            extractedText = await extractTextFromFile(file);
+          } catch {
+            extractedText = undefined;
+          }
+
+          setQueue((prev) =>
+            prev.map((item) =>
+              item.id === queueId ? { ...item, status: "uploading" } : item
+            )
+          );
+          await uploadMutation.mutateAsync({
+            file,
+            teamId,
+            folderId: currentFolderId,
+            isPrivate: isPrivateUpload,
+            extractedText,
+          });
+          setQueue((prev) =>
+            prev.map((item) => (item.id === queueId ? { ...item, status: "done" } : item))
+          );
         } catch {
-          // Text extraction is optional; continue without it
-          extractedText = undefined;
+          setQueue((prev) =>
+            prev.map((item) => (item.id === queueId ? { ...item, status: "error" } : item))
+          );
         }
-
-        setUploadStatus("Uploading file...");
-        await uploadMutation.mutateAsync({
-          file,
-          teamId,
-          folderId: currentFolderId,
-          isPrivate: isPrivateUpload,
-          extractedText,
-        });
-
-        setUploadStatus("Upload complete!");
-        setTimeout(() => {
-          setUploading(false);
-          setUploadStatus("");
-        }, 1500);
-      } catch {
-        setUploadStatus("Upload failed. Please try again.");
-        setTimeout(() => {
-          setUploading(false);
-          setUploadStatus("");
-        }, 2000);
       }
+      setUploading(false);
     },
     [teamId, currentFolderId, isPrivateUpload, uploadMutation]
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleUpload(file);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) {
+      handleUpload(files);
     }
     // Reset input so re-uploading the same file works
     if (fileInputRef.current) {
@@ -95,14 +110,28 @@ export function UploadPanel({
     e.stopPropagation();
     setIsDraggingOver(false);
 
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleUpload(file);
+    const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+    if (files.length > 0) {
+      handleUpload(files);
     }
   };
 
+  const getStatusLabel = (status: (typeof queue)[number]["status"]) => {
+    if (status === "queued") return "Queued";
+    if (status === "extracting") return "Extracting";
+    if (status === "uploading") return "Uploading";
+    if (status === "done") return "Uploaded";
+    return "Failed";
+  };
+
   return (
-    <div className="flex h-full flex-col border-l border-slate-200 bg-white dark:border-navy-700 dark:bg-navy-900">
+    <div
+      className={`flex h-full flex-col ${
+        variant === "panel"
+          ? "border-l border-slate-200 bg-white dark:border-navy-700 dark:bg-navy-900"
+          : "bg-white dark:bg-navy-900"
+      }`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-navy-700">
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -117,14 +146,14 @@ export function UploadPanel({
       </div>
 
       {/* Drop Zone */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 space-y-4 overflow-auto p-4">
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !uploading && fileInputRef.current?.click()}
           className={cn(
-            "flex h-80 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors",
+            "app-focus-ring flex h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-colors",
             isDraggingOver
               ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
               : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-navy-600 dark:bg-navy-800/50 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/10",
@@ -135,7 +164,7 @@ export function UploadPanel({
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                {uploadStatus}
+                Processing uploads...
               </p>
             </div>
           ) : (
@@ -171,10 +200,37 @@ export function UploadPanel({
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept={ACCEPTED_FILE_TYPES}
           onChange={handleFileChange}
           className="hidden"
         />
+
+        {queue.length > 0 && (
+          <div className="app-surface-soft max-h-56 overflow-auto p-3">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Upload Queue
+            </h3>
+            <ul className="space-y-1.5">
+              {queue.map((item) => (
+                <li key={item.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs dark:bg-navy-900">
+                  <span className="truncate pr-3 text-slate-700 dark:text-slate-200">{item.name}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-semibold ${
+                      item.status === "done"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        : item.status === "error"
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                    }`}
+                  >
+                    {getStatusLabel(item.status)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Private Upload Toggle */}

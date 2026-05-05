@@ -3,14 +3,14 @@
 import React from "react";
 import Image from "next/image";
 import {
-  Plus,
-  FolderPlus,
+  Upload,
   Folder,
   Clock,
   Star,
   Trash2,
   Shield,
   LogOut,
+  UserRoundCog,
   ChevronRight,
 } from "lucide-react";
 import { FolderRecord } from "@/lib/types";
@@ -39,12 +39,12 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onMobileClose: () => void;
   onSignOut: () => void;
+  onShowPersonalInfo: () => void;
   onDragOver: (e: React.DragEvent, folderId: string | null) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, folderId: string | null) => void;
+  activeSection: "files" | "recent" | "starred" | "archive" | "admin";
 }
-
-type ActiveView = "files" | "recent" | "starred" | "archive";
 
 export default function Sidebar({
   teamId,
@@ -69,33 +69,56 @@ export default function Sidebar({
   onToggleCollapse,
   onMobileClose,
   onSignOut,
+  onShowPersonalInfo,
   onDragOver,
   onDragLeave,
   onDrop,
+  activeSection,
 }: SidebarProps) {
-  const [activeView, setActiveView] = React.useState<ActiveView>("files");
+  const [rootContextMenu, setRootContextMenu] = React.useState<null | { x: number; y: number }>(
+    null
+  );
+  const rootContextMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!rootContextMenu) return;
+
+    const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (rootContextMenuRef.current && !rootContextMenuRef.current.contains(target)) {
+        setRootContextMenu(null);
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRootContextMenu(null);
+    };
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [rootContextMenu]);
 
   const avatarText = userEmail ? userEmail.slice(0, 2).toUpperCase() : "??";
 
-  const isAtRoot = currentFolderId === null && activeView === "files";
+  const isAtRoot = currentFolderId === null && activeSection === "files";
 
   function handleMyFiles() {
-    setActiveView("files");
-    onNavigateUp(0);
+    onNavigateUp(-1);
   }
 
   function handleRecent() {
-    setActiveView("recent");
     onLoadRecent();
   }
 
   function handleStarred() {
-    setActiveView("starred");
     onLoadStarred();
   }
 
   function handleArchive() {
-    setActiveView("archive");
     onLoadArchive();
   }
 
@@ -104,12 +127,11 @@ export default function Sidebar({
   }
 
   function handleFolderNavigate(folder: FolderRecord, path: FolderRecord[]) {
-    setActiveView("files");
     onNavigateFolder(folder, path);
   }
 
   const showActionButtons =
-    canEdit && activeView === "files";
+    canEdit && activeSection === "files";
 
   return (
     <>
@@ -128,7 +150,7 @@ export default function Sidebar({
           border-r border-slate-200/50 dark:border-slate-800/50
           transition-all duration-300 ease-in-out
           md:relative md:z-auto
-          ${isSidebarCollapsed ? "w-20" : "w-64"}
+          ${isSidebarCollapsed ? "w-16" : "w-60"}
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
@@ -168,27 +190,18 @@ export default function Sidebar({
         {showActionButtons && (
           <div className="px-4 py-3 space-y-2">
             <button
-              onClick={onShowUpload}
+              onClick={() => {
+                onShowUpload();
+              }}
+              title="Upload files"
               className={`
                 flex items-center gap-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700
-                text-white font-medium transition-colors
+                app-focus-ring text-white font-medium transition-colors
                 ${isSidebarCollapsed ? "justify-center p-2.5" : "px-4 py-2.5"}
               `}
             >
-              <Plus className="w-4 h-4 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>New</span>}
-            </button>
-            <button
-              onClick={onShowNewFolder}
-              className={`
-                flex items-center gap-2 w-full rounded-lg
-                text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800
-                font-medium transition-colors
-                ${isSidebarCollapsed ? "justify-center p-2.5" : "px-4 py-2.5"}
-              `}
-            >
-              <FolderPlus className="w-4 h-4 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>New Folder</span>}
+              <Upload className="w-4 h-4 flex-shrink-0" />
+              {!isSidebarCollapsed && <span>Upload</span>}
             </button>
           </div>
         )}
@@ -198,16 +211,27 @@ export default function Sidebar({
           {/* My Files */}
           <button
             onClick={handleMyFiles}
+            title={isSidebarCollapsed ? "My Files" : undefined}
             onDragOver={(e) => onDragOver(e, null)}
             onDragLeave={onDragLeave}
             onDrop={(e) => onDrop(e, null)}
-            className={`
-              flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors
-              ${
-                isAtRoot
-                  ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400"
-                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }
+            onContextMenu={(e) => {
+              if (!canEdit) return;
+              e.preventDefault();
+              e.stopPropagation();
+              onNavigateUp(-1);
+
+              // This is handled by the same context menu used for folders.
+              // We trigger it by calling `onShowNewFolder` / `onShowUpload` from the menu.
+              // (The root menu UI is rendered below.)
+              // Keep it near the cursor, but clamp to the viewport bounds.
+              const x = Math.min(window.innerWidth - 240, Math.max(0, e.clientX));
+              const y = Math.min(window.innerHeight - 160, Math.max(0, e.clientY));
+              setRootContextMenu({ x, y });
+            }}
+            className={`app-nav-item ${
+              isAtRoot ? "app-nav-item-active" : "app-nav-item-idle"
+            }
               ${
                 dragOverFolderId === null && !isAtRoot
                   ? "ring-2 ring-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20"
@@ -221,7 +245,21 @@ export default function Sidebar({
 
           {/* Folder tree under My Files */}
           {!isSidebarCollapsed && teamId && (
-            <div className="pl-3">
+            <div
+              className="pl-3"
+              onContextMenu={(e) => {
+                if (!canEdit) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Selecting "root" ensures create/upload actions target the My Files parent.
+                onNavigateUp(-1);
+
+                const x = Math.min(window.innerWidth - 240, Math.max(0, e.clientX));
+                const y = Math.min(window.innerHeight - 160, Math.max(0, e.clientY));
+                setRootContextMenu({ x, y });
+              }}
+            >
               <SidebarFolderTree
                 teamId={teamId}
                 currentFolderId={currentFolderId}
@@ -231,6 +269,8 @@ export default function Sidebar({
                 onDragLeave={onDragLeave}
                 onDrop={onDrop}
                 dragOverFolderId={dragOverFolderId}
+                onShowNewFolder={canEdit ? onShowNewFolder : undefined}
+                onShowUpload={canEdit ? onShowUpload : undefined}
               />
             </div>
           )}
@@ -238,14 +278,10 @@ export default function Sidebar({
           {/* Recent */}
           <button
             onClick={handleRecent}
-            className={`
-              flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors
-              ${
-                activeView === "recent"
-                  ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400"
-                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }
-            `}
+            title={isSidebarCollapsed ? "Recent" : undefined}
+            className={`app-nav-item ${
+              activeSection === "recent" ? "app-nav-item-active" : "app-nav-item-idle"
+            }`}
           >
             <Clock className="w-4 h-4 flex-shrink-0" />
             {!isSidebarCollapsed && <span>Recent</span>}
@@ -254,14 +290,10 @@ export default function Sidebar({
           {/* Starred */}
           <button
             onClick={handleStarred}
-            className={`
-              flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors
-              ${
-                activeView === "starred"
-                  ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400"
-                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }
-            `}
+            title={isSidebarCollapsed ? "Starred" : undefined}
+            className={`app-nav-item ${
+              activeSection === "starred" ? "app-nav-item-active" : "app-nav-item-idle"
+            }`}
           >
             <Star className="w-4 h-4 flex-shrink-0" />
             {!isSidebarCollapsed && <span>Starred</span>}
@@ -270,14 +302,10 @@ export default function Sidebar({
           {/* Trash */}
           <button
             onClick={handleArchive}
-            className={`
-              flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors
-              ${
-                activeView === "archive"
-                  ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400"
-                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }
-            `}
+            title={isSidebarCollapsed ? "Trash" : undefined}
+            className={`app-nav-item ${
+              activeSection === "archive" ? "app-nav-item-active" : "app-nav-item-idle"
+            }`}
           >
             <Trash2 className="w-4 h-4 flex-shrink-0" />
             {!isSidebarCollapsed && <span>Trash</span>}
@@ -287,14 +315,10 @@ export default function Sidebar({
           {(userRole === "owner" || userRole === "admin") && (
             <button
               onClick={handleAdmin}
-              className={`
-                flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors
-                ${
-                  showAdminPanel
-                    ? "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400"
-                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }
-              `}
+              title={isSidebarCollapsed ? "Team Management" : undefined}
+              className={`app-nav-item ${
+                activeSection === "admin" ? "app-nav-item-active" : "app-nav-item-idle"
+              }`}
             >
               <Shield className="w-4 h-4 flex-shrink-0" />
               {!isSidebarCollapsed && <span>Team Management</span>}
@@ -318,6 +342,13 @@ export default function Sidebar({
                     {userEmail ?? ""}
                   </p>
                 </div>
+                <button
+                  onClick={onShowPersonalInfo}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                  title="Personal info"
+                >
+                  <UserRoundCog className="w-4 h-4" />
+                </button>
                 <button
                   onClick={onSignOut}
                   className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
@@ -347,6 +378,37 @@ export default function Sidebar({
           />
         </button>
       </aside>
+
+      {/* Root (My Files) context menu */}
+      {rootContextMenu && !isMobileMenuOpen && (
+        <div
+          style={{ position: "fixed", left: rootContextMenu.x, top: rootContextMenu.y, zIndex: 200 }}
+          ref={rootContextMenuRef}
+          className="min-w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-navy-800 dark:bg-navy-950"
+          role="menu"
+        >
+          <button
+            onClick={() => {
+              setRootContextMenu(null);
+              onShowNewFolder();
+            }}
+            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy-900"
+            role="menuitem"
+          >
+            New Folder
+          </button>
+          <button
+            onClick={() => {
+              setRootContextMenu(null);
+              onShowUpload();
+            }}
+            className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-navy-900"
+            role="menuitem"
+          >
+            New File
+          </button>
+        </div>
+      )}
     </>
   );
 }
