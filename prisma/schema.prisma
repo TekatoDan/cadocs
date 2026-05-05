@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["auth", "public"]
 }
 
 model User {
@@ -26,6 +27,7 @@ model User {
   messages           Message[]
 
   @@map("users")
+  @@schema("public")
 }
 
 model Team {
@@ -44,6 +46,7 @@ model Team {
   messages Message[]
 
   @@map("teams")
+  @@schema("public")
 }
 
 model TeamMember {
@@ -58,6 +61,7 @@ model TeamMember {
 
   @@unique([teamId, userId])
   @@map("team_members")
+  @@schema("public")
 }
 
 model Folder {
@@ -77,6 +81,7 @@ model Folder {
 
   @@unique([teamId, parentId, name])
   @@map("folders")
+  @@schema("public")
 }
 
 model File {
@@ -104,6 +109,7 @@ model File {
   contents     DocumentContent[]
 
   @@map("files")
+  @@schema("public")
 }
 
 model FilePermission {
@@ -120,6 +126,7 @@ model FilePermission {
 
   @@unique([fileId, userId])
   @@map("file_permissions")
+  @@schema("public")
 }
 
 model DocumentContent {
@@ -132,6 +139,7 @@ model DocumentContent {
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@map("document_contents")
+  @@schema("public")
 }
 
 model AuditLog {
@@ -148,6 +156,7 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
+  @@schema("public")
 }
 
 model Message {
@@ -161,5 +170,6 @@ model Message {
   team Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@map("messages")
+  @@map("team_messages")
+  @@schema("public")
 }
