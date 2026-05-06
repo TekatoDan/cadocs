@@ -62,7 +62,12 @@ export function useUploadDocument() {
       formData.append("isPrivate", String(isPrivate));
       formData.append("maxFileNameLength", "80");
 
-      const record = await uploadDocument(formData);
+      const result = await uploadDocument(formData);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+
+      const record = result.file;
 
       if (extractedText) {
         try {

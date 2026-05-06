@@ -1,7 +1,61 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 const PRIVATE_VISIBILITY = "__VISIBILITY_PRIVATE__";
+const STORAGE_BUCKET = "Cadocs-Bucket";
+
+export class FileAccessAuthError extends Error {
+  constructor() {
+    super("Unauthorized");
+    this.name = "FileAccessAuthError";
+  }
+}
+
+function getBearerToken(authorizationHeader: string | null): string | null {
+  if (!authorizationHeader?.startsWith("Bearer ")) return null;
+  return authorizationHeader.slice("Bearer ".length).trim() || null;
+}
+
+async function getAuthUserForRequest(authorizationHeader: string | null) {
+  const accessToken = getBearerToken(authorizationHeader);
+  if (!accessToken) {
+    try {
+      return await getAuthUser();
+    } catch {
+      throw new FileAccessAuthError();
+    }
+  }
+
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+  );
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(accessToken);
+
+  if (error || !user) throw new FileAccessAuthError();
+  return user;
+}
+
+async function getStorageClientForRequest(authorizationHeader: string | null) {
+  const accessToken = getBearerToken(authorizationHeader);
+  if (!accessToken) return getSupabaseClient();
+
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    }
+  );
+}
 
 export function encodeContentDisposition(
   fileName: string,
@@ -11,8 +65,11 @@ export function encodeContentDisposition(
   return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
-export async function getAuthorizedStorageFile(storagePath: string) {
-  const user = await getAuthUser();
+export async function getAuthorizedStorageFile(
+  storagePath: string,
+  authorizationHeader: string | null
+) {
+  const user = await getAuthUserForRequest(authorizationHeader);
 
   return prisma.file.findFirst({
     where: {
@@ -31,10 +88,13 @@ export async function getAuthorizedStorageFile(storagePath: string) {
   });
 }
 
-export async function fetchStorageFile(storagePath: string) {
-  const supabase = await getSupabaseClient();
+export async function fetchStorageFile(
+  storagePath: string,
+  authorizationHeader: string | null
+) {
+  const supabase = await getStorageClientForRequest(authorizationHeader);
   const { data, error } = await supabase.storage
-    .from("Cadocs-Bucket")
+    .from(STORAGE_BUCKET)
     .createSignedUrl(storagePath, 60);
 
   if (error) {

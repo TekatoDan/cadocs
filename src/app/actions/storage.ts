@@ -8,6 +8,14 @@ const STORAGE_BUCKET = "Cadocs-Bucket";
 const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
 const MIN_FILE_NAME_LENGTH = 16;
 
+type UploadDocumentResult =
+  | { ok: true; file: UploadedFileRecord }
+  | { ok: false; error: string };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function clampFileNameLength(value: FormDataEntryValue | null): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_MAX_FILE_NAME_LENGTH;
@@ -201,52 +209,60 @@ export async function moveDocument(
 
 export async function uploadDocument(
   formData: FormData
-): Promise<UploadedFileRecord> {
-  const user = await getAuthUser();
-  const supabase = await getSupabaseClient();
+): Promise<UploadDocumentResult> {
+  let storagePath: string | null = null;
 
-  const file = formData.get("file") as File;
-  const teamId = formData.get("teamId") as string;
-  const folderId = (formData.get("folderId") as string) || null;
-  const isPrivate = formData.get("isPrivate") === "true";
-  const maxFileNameLength = clampFileNameLength(formData.get("maxFileNameLength"));
-
-  if (!file || !teamId) {
-    throw new Error("Upload is missing the file or destination team.");
-  }
-
-  const displayName = await getAvailableFileName(
-    teamId,
-    folderId || null,
-    file.name,
-    maxFileNameLength
-  );
-
-  // Upload to Supabase Storage
-  const fileExt = file.name.split(".").pop();
-  const uniqueId = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
-  const storagePath = `${teamId}/${uniqueId}.${fileExt}`;
-
-  const arrayBuffer = await file.arrayBuffer();
-  const { error: uploadError } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, arrayBuffer, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type,
-    });
-
-  if (uploadError) {
-    console.error("Supabase storage upload failed:", {
-      bucket: STORAGE_BUCKET,
-      storagePath,
-      message: uploadError.message,
-    });
-    throw new Error(`Storage upload failed: ${uploadError.message}`);
-  }
-
-  // Create DB record via Prisma
   try {
+    const user = await getAuthUser();
+    const supabase = await getSupabaseClient();
+
+    const file = formData.get("file") as File | null;
+    const teamId = formData.get("teamId") as string | null;
+    const folderId = (formData.get("folderId") as string) || null;
+    const isPrivate = formData.get("isPrivate") === "true";
+    const maxFileNameLength = clampFileNameLength(
+      formData.get("maxFileNameLength")
+    );
+
+    if (!file || !teamId) {
+      return {
+        ok: false,
+        error: "Upload is missing the file or destination team.",
+      };
+    }
+
+    const displayName = await getAvailableFileName(
+      teamId,
+      folderId || null,
+      file.name,
+      maxFileNameLength
+    );
+
+    const fileExt = file.name.split(".").pop();
+    const uniqueId = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+    storagePath = `${teamId}/${uniqueId}${fileExt ? `.${fileExt}` : ""}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, arrayBuffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type || "application/octet-stream",
+      });
+
+    if (uploadError) {
+      console.error("Supabase storage upload failed:", {
+        bucket: STORAGE_BUCKET,
+        storagePath,
+        message: uploadError.message,
+      });
+      return {
+        ok: false,
+        error: `Storage upload failed: ${uploadError.message}`,
+      };
+    }
+
     const record = await prisma.file.create({
       data: {
         teamId,
@@ -260,10 +276,22 @@ export async function uploadDocument(
         createdBy: user.id,
       },
     });
-    return serializeFile(record);
-  } catch (dbError: any) {
-    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
-    throw new Error(dbError.message);
+    return { ok: true, file: serializeFile(record) };
+  } catch (error) {
+    console.error("Document upload failed:", error);
+    if (storagePath) {
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+      } catch (cleanupError) {
+        console.error("Failed to clean up uploaded object:", cleanupError);
+      }
+    }
+
+    return {
+      ok: false,
+      error: getErrorMessage(error, "Upload failed. Please try again."),
+    };
   }
 }
 

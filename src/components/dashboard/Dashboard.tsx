@@ -33,7 +33,7 @@ import { useRestoreFolder } from "@/hooks/use-folders";
 type ViewMode = "files" | "recent" | "starred" | "archive";
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { session, user, signOut } = useAuth();
 
   // Team data
   const { data: team, isLoading: teamLoading } = useDefaultTeam(user?.id);
@@ -377,6 +377,9 @@ export default function Dashboard() {
       const response = await fetch(`/api/files/download?${params.toString()}`, {
         cache: "no-store",
         credentials: "include",
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
 
       if (!response.ok) {
@@ -399,7 +402,7 @@ export default function Dashboard() {
         error instanceof Error ? error.message : "Unable to download file."
       );
     }
-  }, []);
+  }, [session?.access_token]);
 
   // Delete handlers
   const handleConfirmDelete = useCallback(async () => {

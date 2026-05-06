@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { FileText, X, Printer, Download, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import type { UploadedFileRecord } from "@/lib/types";
 
 if (typeof window !== "undefined") {
@@ -77,6 +78,7 @@ export default function FilePreviewModal({
   onClose,
   onDownload,
 }: FilePreviewModalProps) {
+  const { session } = useAuth();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -114,6 +116,9 @@ export default function FilePreviewModal({
           const response = await fetch(url, {
             cache: "no-store",
             credentials: "include",
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
           });
           if (!response.ok) {
             throw new Error("Unable to load text preview.");
@@ -129,6 +134,9 @@ export default function FilePreviewModal({
           const response = await fetch(url, {
             cache: "no-store",
             credentials: "include",
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
           });
           if (!response.ok) {
             throw new Error("Unable to load file preview.");
@@ -160,7 +168,7 @@ export default function FilePreviewModal({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [file]);
+  }, [file, session?.access_token]);
 
   const handlePrint = useCallback(() => {
     if (!file) return;

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import {
   encodeContentDisposition,
+  FileAccessAuthError,
   fetchStorageFile,
   getAuthorizedStorageFile,
 } from "../_lib";
@@ -16,13 +17,14 @@ export async function GET(request: NextRequest) {
       return new Response("Missing file path", { status: 400 });
     }
 
-    const file = await getAuthorizedStorageFile(storagePath);
+    const authorizationHeader = request.headers.get("authorization");
+    const file = await getAuthorizedStorageFile(storagePath, authorizationHeader);
 
     if (!file) {
       return new Response("File not found", { status: 404 });
     }
 
-    const upstream = await fetchStorageFile(file.storagePath);
+    const upstream = await fetchStorageFile(file.storagePath, authorizationHeader);
 
     if (!upstream.ok || !upstream.body) {
       return new Response("Unable to load file download", {
@@ -44,6 +46,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to download file:", error);
-    return new Response("Unauthorized", { status: 401 });
+    const isUnauthorized = error instanceof FileAccessAuthError;
+    return new Response(
+      isUnauthorized ? "Unauthorized" : "Unable to load file download",
+      { status: isUnauthorized ? 401 : 502 }
+    );
   }
 }
