@@ -181,7 +181,7 @@ export function FileRow({
 
       {/* Name */}
       <td className="px-4 py-4">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div
             className={cn(
               "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-white/70",
@@ -190,7 +190,7 @@ export function FileRow({
           >
             <FileIcon className={cn("h-5 w-5 stroke-[1.8]", iconColor)} />
           </div>
-          <div className="flex items-center gap-2 truncate">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {isRenaming ? (
               <input
                 ref={renameInputRef}
@@ -201,13 +201,13 @@ export function FileRow({
                 onBlur={handleRenameSubmit}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "rounded-md border px-2 py-1 text-sm outline-none",
+                  "min-w-0 max-w-full rounded-md border px-2 py-1 text-sm outline-none",
                   "border-indigo-500 bg-white text-slate-900 ring-2 ring-indigo-500/20",
                   "dark:bg-navy-900 dark:text-white"
                 )}
               />
             ) : (
-              <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+              <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={file.name}>
                 {file.name}
               </span>
             )}
@@ -291,7 +291,10 @@ export function FileRow({
           )}
 
           <button
-            onClick={() => onDownload(file.storage_path, file.name)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload(file.storage_path, file.name);
+            }}
             className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
             title="Download"
             aria-label={`Download file ${file.name}`}

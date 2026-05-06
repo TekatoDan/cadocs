@@ -371,14 +371,34 @@ export default function Dashboard() {
   }, []);
 
   // Download handler
-  const handleDownload = useCallback((storagePath: string, fileName: string) => {
-    const params = new URLSearchParams({ path: storagePath });
-    const link = document.createElement("a");
-    link.href = `/api/files/download?${params.toString()}`;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
+    try {
+      const params = new URLSearchParams({ path: storagePath });
+      const response = await fetch(`/api/files/download?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Unable to download file.");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName || "download";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error("Download failed:", error);
+      window.alert(
+        error instanceof Error ? error.message : "Unable to download file."
+      );
+    }
   }, []);
 
   // Delete handlers

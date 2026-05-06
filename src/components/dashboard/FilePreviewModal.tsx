@@ -96,6 +96,7 @@ export default function FilePreviewModal({
     }
 
     let cancelled = false;
+    let objectUrl: string | null = null;
 
     async function loadPreview() {
       if (!file) return;
@@ -110,7 +111,10 @@ export default function FilePreviewModal({
         const url = getPreviewUrl(file.storage_path);
 
         if (isTextFile(file.mime_type, file.name)) {
-          const response = await fetch(url, { cache: "no-store" });
+          const response = await fetch(url, {
+            cache: "no-store",
+            credentials: "include",
+          });
           if (!response.ok) {
             throw new Error("Unable to load text preview.");
           }
@@ -118,10 +122,25 @@ export default function FilePreviewModal({
           if (!cancelled) {
             setPreviewText(text);
           }
-        } else if (file.mime_type === "application/pdf") {
-          if (!cancelled) setPreviewUrl(url);
-        } else if (file.mime_type.startsWith("image/")) {
-          if (!cancelled) setPreviewUrl(url);
+        } else if (
+          file.mime_type === "application/pdf" ||
+          file.mime_type.startsWith("image/")
+        ) {
+          const response = await fetch(url, {
+            cache: "no-store",
+            credentials: "include",
+          });
+          if (!response.ok) {
+            throw new Error("Unable to load file preview.");
+          }
+          const blob = await response.blob();
+          objectUrl = URL.createObjectURL(blob);
+          if (cancelled) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+            return;
+          }
+          setPreviewUrl(objectUrl);
         }
       } catch (error) {
         console.error("Failed to load preview:", error);
@@ -139,6 +158,7 @@ export default function FilePreviewModal({
 
     return () => {
       cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [file]);
 
@@ -270,6 +290,10 @@ export default function FilePreviewModal({
                   setNumPages(n);
                 }}
                 onLoadError={() => setPreviewError("Preview could not be loaded.")}
+                onSourceError={(error) => {
+                  console.error("Failed to load PDF source:", error);
+                  setPreviewError("Preview could not be loaded.");
+                }}
                 loading={
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-slate-400" />

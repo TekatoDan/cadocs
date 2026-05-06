@@ -60,6 +60,7 @@ export function useUploadDocument() {
       formData.append("teamId", teamId);
       if (folderId) formData.append("folderId", folderId);
       formData.append("isPrivate", String(isPrivate));
+      formData.append("maxFileNameLength", "80");
 
       const record = await uploadDocument(formData);
 

@@ -5,6 +5,70 @@ import { getAuthUser, getSupabaseClient } from "@/lib/auth";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
 const STORAGE_BUCKET = "Cadocs-Bucket";
+const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
+const MIN_FILE_NAME_LENGTH = 16;
+
+function clampFileNameLength(value: FormDataEntryValue | null): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_MAX_FILE_NAME_LENGTH;
+  return Math.max(MIN_FILE_NAME_LENGTH, Math.min(160, Math.floor(parsed)));
+}
+
+function splitFileName(fileName: string) {
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
+    return { baseName: fileName, extension: "" };
+  }
+
+  return {
+    baseName: fileName.slice(0, dotIndex),
+    extension: fileName.slice(dotIndex),
+  };
+}
+
+function shortenFileName(fileName: string, maxLength: number, suffix = "") {
+  const normalizedName = fileName.replace(/\s+/g, " ").trim();
+  if (normalizedName.length <= maxLength && !suffix) return normalizedName;
+
+  const { baseName, extension } = splitFileName(normalizedName);
+  const availableBaseLength = Math.max(
+    1,
+    maxLength - extension.length - suffix.length
+  );
+  const shortenedBase =
+    baseName.length > availableBaseLength
+      ? baseName.slice(0, availableBaseLength).trimEnd()
+      : baseName;
+
+  return `${shortenedBase}${suffix}${extension}`;
+}
+
+async function getAvailableFileName(
+  teamId: string,
+  folderId: string | null,
+  originalName: string,
+  maxLength: number
+) {
+  const shortenedName = shortenFileName(originalName, maxLength);
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+    const candidate =
+      attempt === 0 ? shortenedName : shortenFileName(originalName, maxLength, suffix);
+    const existing = await prisma.file.findFirst({
+      where: {
+        teamId,
+        name: candidate,
+        folderId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) return candidate;
+  }
+
+  throw new Error("Unable to create a unique shortened file name in this folder.");
+}
 
 // Helper to convert Prisma BigInt to number for JSON serialization
 function serializeFile(file: any): UploadedFileRecord {
@@ -145,22 +209,18 @@ export async function uploadDocument(
   const teamId = formData.get("teamId") as string;
   const folderId = (formData.get("folderId") as string) || null;
   const isPrivate = formData.get("isPrivate") === "true";
+  const maxFileNameLength = clampFileNameLength(formData.get("maxFileNameLength"));
 
   if (!file || !teamId) {
     throw new Error("Upload is missing the file or destination team.");
   }
 
-  // Check duplicate
-  const existing = await prisma.file.findFirst({
-    where: {
-      teamId,
-      name: file.name,
-      folderId: folderId || null,
-    },
-  });
-  if (existing) {
-    throw new Error(`A file named "${file.name}" already exists in this location.`);
-  }
+  const displayName = await getAvailableFileName(
+    teamId,
+    folderId || null,
+    file.name,
+    maxFileNameLength
+  );
 
   // Upload to Supabase Storage
   const fileExt = file.name.split(".").pop();
@@ -191,7 +251,7 @@ export async function uploadDocument(
       data: {
         teamId,
         folderId,
-        name: file.name,
+        name: displayName,
         description: isPrivate ? "__VISIBILITY_PRIVATE__" : null,
         storagePath,
         sizeBytes: BigInt(file.size),

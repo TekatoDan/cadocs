@@ -110,11 +110,11 @@ export function FolderRow({
 
       {/* Name */}
       <td className="px-4 py-4">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 transition-colors group-hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60">
             <Folder className="h-5 w-5 fill-indigo-100 stroke-[1.8] dark:fill-indigo-900/50" />
           </div>
-          <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+          <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={folder.name}>
             {folder.name}
           </span>
         </div>

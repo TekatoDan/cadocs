@@ -144,7 +144,7 @@ export function FileTable({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-navy-700/80 dark:bg-navy-900">
       <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px]">
+      <table className="w-full min-w-[860px] table-fixed">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-navy-700 dark:bg-navy-800/60">
             <th className="w-12 px-5 py-4 text-left">
@@ -156,7 +156,7 @@ export function FileTable({
                 className="app-focus-ring h-4 w-4 rounded border-slate-300 text-indigo-600"
               />
             </th>
-            <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th className="w-[44%] px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <button
                 onClick={() => onSortChange("name")}
                 className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
@@ -165,7 +165,7 @@ export function FileTable({
               </button>
             </th>
             {columns.owner && (
-              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th className="w-[12%] px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("owner")}
                   className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
@@ -175,7 +175,7 @@ export function FileTable({
               </th>
             )}
             {columns.lastModified && (
-              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th className="w-[13%] px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("lastModified")}
                   className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
@@ -185,7 +185,7 @@ export function FileTable({
               </th>
             )}
             {columns.size && (
-              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th className="w-[10%] px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("size")}
                   className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
@@ -194,7 +194,7 @@ export function FileTable({
                 </button>
               </th>
             )}
-            <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th className="w-36 px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Actions
             </th>
           </tr>

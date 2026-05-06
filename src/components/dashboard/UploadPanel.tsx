@@ -14,6 +14,12 @@ interface UploadPanelProps {
 }
 
 const ACCEPTED_FILE_TYPES = ".pdf,.txt,.md,.csv,.png,.jpg,.jpeg";
+const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${Math.ceil(bytes / (1024 * 1024))} MB`;
+}
 
 export function UploadPanel({
   teamId,
@@ -37,60 +43,80 @@ export function UploadPanel({
 
   const handleUpload = useCallback(
     async (files: File[]) => {
-      setUploading(true);
-      const initialQueue = files.map((file) => ({
-        id: `${file.name}-${file.size}-${file.lastModified}`,
+      const uploadItems = files.map((file, index) => {
+        const isTooLarge = file.size > MAX_UPLOAD_SIZE_BYTES;
+        return {
+          file,
+          id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+          isTooLarge,
+        };
+      });
+      const initialQueue = uploadItems.map(({ file, id, isTooLarge }) => ({
+        id,
         name: file.name,
-        status: "queued" as const,
-        message: undefined,
+        status: isTooLarge ? ("error" as const) : ("queued" as const),
+        message: isTooLarge
+          ? `File is ${formatFileSize(file.size)}. Uploads are limited to ${formatFileSize(
+              MAX_UPLOAD_SIZE_BYTES
+            )}.`
+          : undefined,
       }));
+      const uploadableItems = uploadItems.filter((item) => !item.isTooLarge);
+
       setQueue(initialQueue);
+      if (uploadableItems.length === 0) return;
 
-      for (const file of files) {
-        const queueId = `${file.name}-${file.size}-${file.lastModified}`;
-        try {
-          let extractedText: string | undefined;
+      setUploading(true);
 
-          setQueue((prev) =>
-            prev.map((item) =>
-              item.id === queueId ? { ...item, status: "extracting" } : item
-            )
-          );
+      try {
+        for (const { file, id: queueId } of uploadableItems) {
           try {
-            extractedText = await extractTextFromFile(file);
-          } catch {
-            extractedText = undefined;
-          }
+            let extractedText: string | undefined;
 
-          setQueue((prev) =>
-            prev.map((item) =>
-              item.id === queueId ? { ...item, status: "uploading" } : item
-            )
-          );
-          await uploadMutation.mutateAsync({
-            file,
-            teamId,
-            folderId: currentFolderId,
-            isPrivate: isPrivateUpload,
-            extractedText,
-          });
-          setQueue((prev) =>
-            prev.map((item) => (item.id === queueId ? { ...item, status: "done" } : item))
-          );
-        } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Upload failed. Please try again.";
-          console.error(`Upload failed for ${file.name}:`, error);
-          setQueue((prev) =>
-            prev.map((item) =>
-              item.id === queueId ? { ...item, status: "error", message } : item
-            )
-          );
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === queueId ? { ...item, status: "extracting" } : item
+              )
+            );
+            try {
+              extractedText = await extractTextFromFile(file);
+            } catch {
+              extractedText = undefined;
+            }
+
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === queueId ? { ...item, status: "uploading" } : item
+              )
+            );
+            await uploadMutation.mutateAsync({
+              file,
+              teamId,
+              folderId: currentFolderId,
+              isPrivate: isPrivateUpload,
+              extractedText,
+            });
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === queueId ? { ...item, status: "done" } : item
+              )
+            );
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Upload failed. Please try again.";
+            console.error(`Upload failed for ${file.name}:`, error);
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === queueId ? { ...item, status: "error", message } : item
+              )
+            );
+          }
         }
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     },
     [teamId, currentFolderId, isPrivateUpload, uploadMutation]
   );

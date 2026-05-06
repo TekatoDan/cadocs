@@ -17,14 +17,6 @@ export async function getAuthorizedStorageFile(storagePath: string) {
   return prisma.file.findFirst({
     where: {
       storagePath,
-      team: {
-        members: {
-          some: {
-            userId: user.id,
-            role: { not: "rejected" },
-          },
-        },
-      },
       OR: [
         { description: null },
         { description: { not: PRIVATE_VISIBILITY } },
