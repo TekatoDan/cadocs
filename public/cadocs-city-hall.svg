@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" role="img" aria-label="Municipal city hall campus">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#73b7ff"/>
+      <stop offset="0.46" stop-color="#d9ecff"/>
+      <stop offset="1" stop-color="#f8fbff"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#d7ecff"/>
+      <stop offset="0.52" stop-color="#77add8"/>
+      <stop offset="1" stop-color="#1e5f9b"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#b6c2ce"/>
+    </linearGradient>
+    <linearGradient id="navyFade" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#071946" stop-opacity="0"/>
+      <stop offset="1" stop-color="#071946" stop-opacity=".18"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#06265b" flood-opacity=".2"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#sky)"/>
+  <circle cx="1070" cy="116" r="58" fill="#fff7d6" opacity=".9"/>
+  <path d="M0 151c75-41 148-49 220-23 72 25 137 24 196-4 81-38 164-34 248 12 71 39 152 43 243 12 89-31 174-23 254 24 87 50 180 51 279 4v166H0Z" fill="#ffffff" opacity=".58"/>
+  <path d="M0 215c73-30 143-34 210-11 63 21 123 20 181-3 87-34 172-26 256 22 73 42 157 46 251 13 83-29 162-20 238 28 92 57 193 60 304 9v134H0Z" fill="#ffffff" opacity=".35"/>
+
+  <g opacity=".76">
+    <rect x="744" y="285" width="52" height="276" fill="#83a9ca"/>
+    <rect x="804" y="214" width="74" height="347" fill="#6f9bc1"/>
+    <rect x="893" y="330" width="58" height="231" fill="#8bb3d1"/>
+    <rect x="962" y="268" width="82" height="293" fill="#6a98bd"/>
+    <rect x="1058" y="363" width="54" height="198" fill="#92bad7"/>
+    <rect x="1130" y="240" width="68" height="321" fill="#5f8fb8"/>
+    <rect x="1212" y="322" width="56" height="239" fill="#8db7d6"/>
+    <rect x="1281" y="284" width="80" height="277" fill="#6f9bc1"/>
+    <path d="M1130 240h68l-34-40Z" fill="#4e7fa9"/>
+    <g fill="#d8edff" opacity=".9">
+      <path d="M760 318h18v16h-18zM760 360h18v16h-18zM760 402h18v16h-18zM760 444h18v16h-18zM760 486h18v16h-18z"/>
+      <path d="M827 248h20v18h-20zM827 292h20v18h-20zM827 336h20v18h-20zM827 380h20v18h-20zM827 424h20v18h-20zM827 468h20v18h-20z"/>
+      <path d="M914 365h18v16h-18zM914 407h18v16h-18zM914 449h18v16h-18zM914 491h18v16h-18z"/>
+      <path d="M988 304h22v18h-22zM988 350h22v18h-22zM988 396h22v18h-22zM988 442h22v18h-22zM988 488h22v18h-22z"/>
+      <path d="M1152 276h20v18h-20zM1152 320h20v18h-20zM1152 364h20v18h-20zM1152 408h20v18h-20zM1152 452h20v18h-20z"/>
+      <path d="M1308 322h20v18h-20zM1308 366h20v18h-20zM1308 410h20v18h-20zM1308 454h20v18h-20zM1308 498h20v18h-20z"/>
+    </g>
+  </g>
+
+  <path d="M0 606c141-24 277-36 408-35 176 1 327 37 486 38 164 1 347-43 546-54v345H0Z" fill="#d9e7f0"/>
+  <path d="M0 645c174-27 334-35 480-25 162 11 304 46 475 43 153-3 314-38 485-55v292H0Z" fill="#c9dce9"/>
+  <path d="M0 726c199-37 374-45 526-25 151 20 287 55 446 48 153-7 309-37 468-48v199H0Z" fill="#b8d3e5"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M86 548h540v248H86z" fill="url(#stone)"/>
+    <path d="M128 352h416v196H128z" fill="#eef4f9"/>
+    <path d="M106 326h462l-32 34H138z" fill="#ffffff"/>
+    <path d="M112 358h446v30H112z" fill="#b9c8d5"/>
+    <path d="M78 546h560v38H78z" fill="#ffffff"/>
+    <path d="M105 584h506v36H105z" fill="#c4d0db"/>
+    <path d="M130 620h456v36H130z" fill="#e8eef4"/>
+    <path d="M160 656h392v130H160z" fill="#f8fafc"/>
+    <path d="M224 680h104v106H224z" fill="#244a70"/>
+    <path d="M339 680h104v106H339z" fill="#244a70"/>
+    <path d="M188 392h72v112h-72zM296 392h72v112h-72zM404 392h72v112h-72z" fill="url(#glass)"/>
+    <path d="M188 392h72v18h-72zM296 392h72v18h-72zM404 392h72v18h-72z" fill="#eef8ff" opacity=".6"/>
+    <path d="M186 504h292v18H186z" fill="#cad7e2"/>
+    <path d="M62 796h604v22H62z" fill="#9fb2c4"/>
+    <path d="M34 818h662v24H34z" fill="#879eb3"/>
+    <path d="M0 842h742v30H0z" fill="#6f879e"/>
+    <text x="267" y="636" fill="#30455a" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="800" letter-spacing="2">CITY HALL</text>
+  </g>
+
+  <g>
+    <path d="M149 494l17-3v139h-17z" fill="#5d6976"/>
+    <path d="M166 496c30 4 48 20 75 18-16 24-44 27-75 18z" fill="#1846a3"/>
+    <path d="M166 518c28 6 46 17 73 13-14 20-42 23-73 16z" fill="#f4d13d"/>
+    <path d="M166 535c27 7 46 15 70 11-18 20-44 22-70 14z" fill="#d82732"/>
+  </g>
+
+  <g fill="#2a7b44">
+    <circle cx="727" cy="645" r="36"/>
+    <circle cx="776" cy="638" r="42"/>
+    <circle cx="833" cy="652" r="35"/>
+    <circle cx="931" cy="648" r="43"/>
+    <circle cx="998" cy="660" r="36"/>
+    <circle cx="1206" cy="653" r="42"/>
+    <circle cx="1277" cy="669" r="36"/>
+    <circle cx="1368" cy="639" r="48"/>
+  </g>
+  <g fill="#6b5a34">
+    <path d="M770 657h14v123h-14zM927 666h14v118h-14zM1201 670h15v115h-15zM1362 660h17v126h-17z"/>
+  </g>
+  <g fill="#1f6d3e" opacity=".88">
+    <ellipse cx="766" cy="783" rx="102" ry="24"/>
+    <ellipse cx="951" cy="787" rx="128" ry="27"/>
+    <ellipse cx="1243" cy="790" rx="142" ry="31"/>
+    <ellipse cx="1373" cy="780" rx="100" ry="24"/>
+  </g>
+
+  <path d="M0 780c211-42 423-51 636-27 175 20 329 48 492 36 112-9 216-31 312-56v167H0Z" fill="#eef4f8" opacity=".78"/>
+  <path d="M0 825c285-45 562-43 831 6 192 35 395 19 609-46v115H0Z" fill="#e7eef5"/>
+  <path d="M0 0h1440v900H0z" fill="url(#navyFade)"/>
+</svg>
