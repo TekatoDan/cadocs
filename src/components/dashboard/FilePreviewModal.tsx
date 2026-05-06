@@ -1,19 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import { FileText, X, Printer, Download, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UploadedFileRecord } from "@/lib/types";
-
-if (typeof window !== "undefined") {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
-}
 
 interface FilePreviewModalProps {
   file: UploadedFileRecord | null;
@@ -83,8 +73,6 @@ export default function FilePreviewModal({
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
 
   useEffect(() => {
     if (!file) {
@@ -92,8 +80,6 @@ export default function FilePreviewModal({
       setPreviewText(null);
       setPreviewError(null);
       setPreviewLoading(false);
-      setNumPages(null);
-      setPageNumber(1);
       return;
     }
 
@@ -106,8 +92,6 @@ export default function FilePreviewModal({
       setPreviewUrl(null);
       setPreviewText(null);
       setPreviewError(null);
-      setNumPages(null);
-      setPageNumber(1);
 
       try {
         const url = getPreviewUrl(file.storage_path);
@@ -290,34 +274,12 @@ export default function FilePreviewModal({
           )}
 
           {!previewError && isPdf && previewUrl && (
-            <div className="flex flex-col items-center gap-4">
-              <Document
-                file={previewUrl}
-                onLoadSuccess={({ numPages: n }) => {
-                  setPreviewError(null);
-                  setNumPages(n);
-                }}
-                onLoadError={() => setPreviewError("Preview could not be loaded.")}
-                onSourceError={(error) => {
-                  console.error("Failed to load PDF source:", error);
-                  setPreviewError("Preview could not be loaded.");
-                }}
-                loading={
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                  </div>
-                }
-              >
-                {numPages &&
-                  Array.from({ length: numPages }, (_, i) => (
-                    <Page
-                      key={i + 1}
-                      pageNumber={i + 1}
-                      className="mb-4 shadow-lg"
-                      width={800}
-                    />
-                  ))}
-              </Document>
+            <div className="h-full min-h-[70vh]">
+              <iframe
+                src={previewUrl}
+                title={file.name}
+                className="h-full w-full rounded-xl border border-slate-200 bg-white dark:border-navy-700"
+              />
             </div>
           )}
 
