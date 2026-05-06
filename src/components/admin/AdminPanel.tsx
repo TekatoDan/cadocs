@@ -7,6 +7,7 @@ import {
   useDiscoveredUsers,
   useUpdateMemberRole,
   useRemoveMember,
+  useRejectMember,
   useInviteUser,
 } from "@/hooks/use-teams";
 
@@ -21,17 +22,25 @@ export function AdminPanel({ teamId, currentUserRole, currentUserId }: AdminPane
   const { data: discoveredUsers = [] } = useDiscoveredUsers(teamId);
   const updateRoleMutation = useUpdateMemberRole();
   const removeMemberMutation = useRemoveMember();
+  const rejectMemberMutation = useRejectMember();
   const inviteUserMutation = useInviteUser();
 
-  const error = membersError?.message || null;
+  const error =
+    membersError?.message ||
+    formatMutationError(updateRoleMutation.error) ||
+    formatMutationError(removeMemberMutation.error) ||
+    formatMutationError(rejectMemberMutation.error) ||
+    formatMutationError(inviteUserMutation.error);
   const processingId =
     updateRoleMutation.isPending
       ? (updateRoleMutation.variables as any)?.memberId
       : removeMemberMutation.isPending
         ? removeMemberMutation.variables
-        : inviteUserMutation.isPending
-          ? (inviteUserMutation.variables as any)?.userId
-          : null;
+        : rejectMemberMutation.isPending
+          ? rejectMemberMutation.variables
+          : inviteUserMutation.isPending
+            ? (inviteUserMutation.variables as any)?.userId
+            : null;
 
   if (isLoading) {
     return (
@@ -106,7 +115,7 @@ export function AdminPanel({ teamId, currentUserRole, currentUserId }: AdminPane
                       Verify
                     </button>
                     <button
-                      onClick={() => removeMemberMutation.mutate(member.id)}
+                      onClick={() => rejectMemberMutation.mutate(member.id)}
                       disabled={processingId === member.id}
                       className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg font-medium transition-colors disabled:opacity-50"
                     >
@@ -196,7 +205,6 @@ export function AdminPanel({ teamId, currentUserRole, currentUserId }: AdminPane
                   >
                     <option value="member">Member</option>
                     <option value="admin">Admin</option>
-                    {currentUserRole === "owner" && <option value="owner">Owner</option>}
                   </select>
                   <button
                     onClick={() => removeMemberMutation.mutate(member.id)}
@@ -252,4 +260,11 @@ export function AdminPanel({ teamId, currentUserRole, currentUserId }: AdminPane
       </div>
     </div>
   );
+}
+
+function formatMutationError(error: unknown) {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Something went wrong while updating the team";
 }

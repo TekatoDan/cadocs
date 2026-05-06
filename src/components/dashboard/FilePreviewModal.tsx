@@ -5,11 +5,13 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { FileText, X, Printer, Download, Loader2 } from "lucide-react";
-import { useSignedUrl } from "@/hooks/use-files";
 import type { UploadedFileRecord } from "@/lib/types";
 
 if (typeof window !== "undefined") {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url
+  ).toString();
 }
 
 interface FilePreviewModalProps {
@@ -56,6 +58,20 @@ function isTextFile(mimeType: string, fileName: string): boolean {
   return TEXT_EXTENSIONS.includes(ext);
 }
 
+function getPreviewUrl(storagePath: string): string {
+  const params = new URLSearchParams({ path: storagePath });
+  return `/api/files/preview?${params.toString()}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export default function FilePreviewModal({
   file,
   onClose,
@@ -63,16 +79,16 @@ export default function FilePreviewModal({
 }: FilePreviewModalProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
-
-  const signedUrlMutation = useSignedUrl();
 
   useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
       setPreviewText(null);
+      setPreviewError(null);
       setPreviewLoading(false);
       setNumPages(null);
       setPageNumber(1);
@@ -86,29 +102,32 @@ export default function FilePreviewModal({
       setPreviewLoading(true);
       setPreviewUrl(null);
       setPreviewText(null);
+      setPreviewError(null);
       setNumPages(null);
       setPageNumber(1);
 
       try {
-        const url = await signedUrlMutation.mutateAsync(file.storage_path);
-
-        if (cancelled) return;
+        const url = getPreviewUrl(file.storage_path);
 
         if (isTextFile(file.mime_type, file.name)) {
-          const response = await fetch(url);
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error("Unable to load text preview.");
+          }
           const text = await response.text();
           if (!cancelled) {
             setPreviewText(text);
           }
         } else if (file.mime_type === "application/pdf") {
-          setPreviewUrl(url);
+          if (!cancelled) setPreviewUrl(url);
         } else if (file.mime_type.startsWith("image/")) {
-          setPreviewUrl(url);
-        } else {
-          setPreviewUrl(url);
+          if (!cancelled) setPreviewUrl(url);
         }
       } catch (error) {
         console.error("Failed to load preview:", error);
+        if (!cancelled) {
+          setPreviewError("Preview could not be loaded.");
+        }
       } finally {
         if (!cancelled) {
           setPreviewLoading(false);
@@ -121,7 +140,6 @@ export default function FilePreviewModal({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
   const handlePrint = useCallback(() => {
@@ -135,7 +153,7 @@ export default function FilePreviewModal({
         <html>
           <head><title>${file.name}</title></head>
           <body>
-            <pre style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word;">${previewText}</pre>
+            <pre style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(previewText)}</pre>
             <script>window.onload = function() { window.print(); }</script>
           </body>
         </html>
@@ -164,7 +182,7 @@ export default function FilePreviewModal({
   const isPdf = file.mime_type === "application/pdf";
   const isImage = file.mime_type.startsWith("image/");
   const isText = previewText !== null;
-  const isUnsupported = !previewLoading && !isText && !isPdf && !isImage;
+  const isUnsupported = !previewLoading && !previewError && !isText && !isPdf && !isImage;
 
   return (
     <div
@@ -209,7 +227,21 @@ export default function FilePreviewModal({
             </div>
           )}
 
-          {isText && (
+          {previewError && (
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-slate-500 dark:text-slate-400">
+              <FileText className="h-16 w-16" />
+              <p className="text-lg">{previewError}</p>
+              <button
+                onClick={() => onDownload(file.storage_path, file.name)}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </button>
+            </div>
+          )}
+
+          {!previewError && isText && (
             <pre className="overflow-auto rounded-xl bg-slate-50 p-4 dark:bg-navy-800">
               <code className="font-mono text-sm text-slate-800 dark:text-slate-200">
                 {previewText}
@@ -217,22 +249,27 @@ export default function FilePreviewModal({
             </pre>
           )}
 
-          {isImage && previewUrl && (
+          {!previewError && isImage && previewUrl && (
             <div className="flex h-full items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt={file.name}
+                onError={() => setPreviewError("Preview could not be loaded.")}
                 className="max-h-full max-w-full object-contain"
               />
             </div>
           )}
 
-          {isPdf && previewUrl && (
+          {!previewError && isPdf && previewUrl && (
             <div className="flex flex-col items-center gap-4">
               <Document
                 file={previewUrl}
-                onLoadSuccess={({ numPages: n }) => setNumPages(n)}
+                onLoadSuccess={({ numPages: n }) => {
+                  setPreviewError(null);
+                  setNumPages(n);
+                }}
+                onLoadError={() => setPreviewError("Preview could not be loaded.")}
                 loading={
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-slate-400" />

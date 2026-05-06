@@ -4,6 +4,46 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser, ensureUserProfile } from "@/lib/auth";
 import type { TeamMember } from "@/lib/types";
 
+const MANAGER_ROLES = new Set(["owner", "admin"]);
+const TEAM_ROLES = new Set(["owner", "admin", "member", "viewer", "rejected"]);
+
+async function assertCanManageMember(memberId: string) {
+  const authUser = await getAuthUser();
+
+  const targetMember = await prisma.teamMember.findUnique({
+    where: { id: memberId },
+    select: { id: true, teamId: true, userId: true, role: true },
+  });
+
+  if (!targetMember) {
+    throw new Error("Team member not found");
+  }
+
+  const currentMember = await prisma.teamMember.findUnique({
+    where: {
+      teamId_userId: {
+        teamId: targetMember.teamId,
+        userId: authUser.id,
+      },
+    },
+    select: { role: true },
+  });
+
+  if (!currentMember || !MANAGER_ROLES.has(currentMember.role)) {
+    throw new Error("You do not have permission to manage this team");
+  }
+
+  if (targetMember.userId === authUser.id) {
+    throw new Error("You cannot change your own team access");
+  }
+
+  if (targetMember.role === "owner" && currentMember.role !== "owner") {
+    throw new Error("Only an owner can manage another owner");
+  }
+
+  return { currentMember, targetMember };
+}
+
 export async function getTeamRole(
   teamId: string,
   userId: string
@@ -43,7 +83,16 @@ export async function updateTeamMemberRole(
   memberId: string,
   newRole: string
 ): Promise<void> {
-  await getAuthUser();
+  if (!TEAM_ROLES.has(newRole)) {
+    throw new Error("Invalid team role");
+  }
+
+  const { currentMember } = await assertCanManageMember(memberId);
+
+  if (newRole === "owner" && currentMember.role !== "owner") {
+    throw new Error("Only an owner can assign ownership");
+  }
+
   await prisma.teamMember.update({
     where: { id: memberId },
     data: { role: newRole },
@@ -51,7 +100,16 @@ export async function updateTeamMemberRole(
 }
 
 export async function removeTeamMember(memberId: string): Promise<void> {
-  await getAuthUser();
+  await assertCanManageMember(memberId);
+
+  await prisma.teamMember.delete({
+    where: { id: memberId },
+  });
+}
+
+export async function rejectTeamMember(memberId: string): Promise<void> {
+  await assertCanManageMember(memberId);
+
   await prisma.teamMember.update({
     where: { id: memberId },
     data: { role: "rejected" },

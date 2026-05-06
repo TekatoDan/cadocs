@@ -7,6 +7,7 @@ import {
   getTeamMembers,
   updateTeamMemberRole,
   removeTeamMember,
+  rejectTeamMember,
   inviteUserToTeam,
   getDiscoveredUsers,
 } from "@/app/actions/teams";
@@ -66,6 +67,16 @@ export function useRemoveMember() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (memberId: string) => removeTeamMember(memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team"] });
+    },
+  });
+}
+
+export function useRejectMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (memberId: string) => rejectTeamMember(memberId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team", "members"] });
     },
