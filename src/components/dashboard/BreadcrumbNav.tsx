@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { HardDrive, ChevronRight } from "lucide-react";
+import { Building2, ChevronRight, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BreadcrumbNavProps {
@@ -75,7 +75,10 @@ export function BreadcrumbNav({
   const isRootActive = segments.length === 0;
 
   return (
-    <div className="app-surface-soft flex items-center rounded-2xl px-3 py-2">
+    <nav
+      aria-label="Breadcrumb"
+      className="flex min-w-0 items-center rounded-2xl border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm backdrop-blur dark:border-navy-700/70 dark:bg-navy-900/80"
+    >
       <button
         type="button"
         onClick={() => onNavigateUp(-1)}
@@ -93,19 +96,19 @@ export function BreadcrumbNav({
             : undefined
         }
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-          "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+          "flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition-colors",
+          "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-white",
           "app-focus-ring",
           dragOverFolderId === null &&
             draggedItem &&
             "ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
         )}
       >
-        <HardDrive className="h-3.5 w-3.5" />
-        CADOcs
+        <Building2 className="h-4 w-4" />
+        CADocs
       </button>
 
-      <ChevronRight className="mx-1 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+      <ChevronRight className="mx-1 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
 
       {isSpecialSection && (
         <>
@@ -113,17 +116,17 @@ export function BreadcrumbNav({
             type="button"
             onClick={handleRootClick}
             className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-xl px-2.5 py-1.5 text-sm font-medium transition-colors",
               "app-focus-ring",
               isRootActive
-                ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                ? "bg-indigo-50 font-bold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/70"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-white"
             )}
           >
             {rootLabel}
           </button>
           {segments.length > 0 && (
-            <ChevronRight className="mx-1 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+            <ChevronRight className="mx-1 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
           )}
         </>
       )}
@@ -147,21 +150,24 @@ export function BreadcrumbNav({
                 : undefined
             }
             className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-xl px-2.5 py-1.5 text-sm font-medium transition-colors",
               "app-focus-ring",
               isRootActive
-                ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
-                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+                ? "bg-indigo-50 font-bold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/70"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-white",
               dragOverFolderId === null &&
                 draggedItem &&
                 !isRootActive &&
                 "ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
             )}
           >
-            My Files
+            <span className="inline-flex items-center gap-1.5">
+              <Folder className="h-4 w-4" aria-hidden="true" />
+              My Files
+            </span>
           </button>
           {segments.length > 0 && (
-            <ChevronRight className="mx-1 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+            <ChevronRight className="mx-1 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
           )}
         </>
       )}
@@ -189,11 +195,11 @@ export function BreadcrumbNav({
                   : undefined
               }
               className={cn(
-                "max-w-[150px] truncate rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                "max-w-[180px] truncate rounded-xl px-2.5 py-1.5 text-sm font-medium transition-colors",
                 "app-focus-ring",
                 isLast
-                  ? "bg-white font-bold text-slate-900 shadow-sm dark:bg-navy-700 dark:text-white"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+                  ? "bg-indigo-50 font-bold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/70"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-white",
                 dragOverFolderId === segment.id &&
                   draggedItem &&
                   "ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
@@ -202,11 +208,11 @@ export function BreadcrumbNav({
               {getSectionLabel(segment.name)}
             </button>
             {!isLast && (
-              <ChevronRight className="mx-1 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+              <ChevronRight className="mx-1 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />
             )}
           </React.Fragment>
         );
       })}
-    </div>
+    </nav>
   );
 }

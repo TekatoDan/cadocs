@@ -217,7 +217,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
   return (
     <div className="w-full">
       <div
-        className={`flex items-center group cursor-pointer rounded-lg py-1.5 pr-3 transition-colors ${isSelected ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"} ${isDragOver ? "ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/30" : ""}`}
+        className={`group flex cursor-pointer items-center rounded-xl py-2 pr-3 transition-all ${isSelected ? "bg-indigo-50 font-semibold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-100"} ${isDragOver ? "bg-indigo-50 ring-2 ring-indigo-500 dark:bg-indigo-900/30" : ""}`}
         style={{ paddingLeft: `${level * 0.75 + 0.75}rem` }}
         onDragOver={(e) => onDragOver?.(e, folder.id)}
         onDragLeave={onDragLeave}
@@ -240,7 +240,8 @@ const FolderItem: React.FC<FolderItemProps> = ({
             e.stopPropagation();
             setIsExpanded(!isExpanded);
           }}
-          className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 mr-1 flex-shrink-0"
+          className="mr-1 flex-shrink-0 rounded-lg p-0.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+          aria-label={isExpanded ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
         >
           {isExpanded ? (
             <ChevronDown className="w-3.5 h-3.5" />
@@ -249,11 +250,11 @@ const FolderItem: React.FC<FolderItemProps> = ({
           )}
         </button>
         <div
-          className="flex items-center gap-2 flex-1 min-w-0"
+          className="flex min-w-0 flex-1 items-center gap-2"
           onClick={() => onNavigate(folder, currentPath)}
         >
           <Folder
-            className={`w-4 h-4 flex-shrink-0 ${isSelected ? "fill-indigo-100 dark:fill-indigo-900/50" : ""}`}
+            className={`h-4 w-4 flex-shrink-0 stroke-[1.8] ${isSelected ? "fill-indigo-100 dark:fill-indigo-900/50" : ""}`}
           />
           <span className="text-sm font-medium truncate">{folder.name}</span>
         </div>

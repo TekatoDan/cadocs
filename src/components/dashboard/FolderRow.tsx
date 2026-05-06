@@ -89,14 +89,15 @@ export function FolderRow({
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
         "group cursor-pointer border-b border-slate-100 transition-colors dark:border-navy-800",
-        "hover:bg-slate-50 dark:hover:bg-navy-800/50",
+        "hover:bg-indigo-50/40 dark:hover:bg-navy-800/50",
+        isSelected && "bg-indigo-50/60 dark:bg-indigo-900/20",
         isDragOver && "bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-inset ring-indigo-500",
         isDragging && "opacity-50"
       )}
       onClick={() => onNavigate(folder)}
     >
       {/* Select */}
-      <td className="px-4 py-3">
+      <td className="px-5 py-4">
         <input
           type="checkbox"
           checked={isSelected}
@@ -108,12 +109,12 @@ export function FolderRow({
       </td>
 
       {/* Name */}
-      <td className="px-4 py-3">
+      <td className="px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-            <Folder className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 transition-colors group-hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60">
+            <Folder className="h-5 w-5 fill-indigo-100 stroke-[1.8] dark:fill-indigo-900/50" />
           </div>
-          <span className="truncate text-sm font-medium text-slate-900 dark:text-white">
+          <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
             {folder.name}
           </span>
         </div>
@@ -121,27 +122,27 @@ export function FolderRow({
 
       {/* Owner */}
       {columns.owner && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           {getOwnerName(folder.created_by, teamMembers, currentUserId)}
         </td>
       )}
 
       {/* Last Modified */}
       {columns.lastModified && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           {formatTimeAgo(folder.created_at)}
         </td>
       )}
 
       {/* Size */}
       {columns.size && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           --
         </td>
       )}
 
       {/* Actions */}
-      <td className="px-4 py-3">
+      <td className="px-5 py-4">
         <div
           className={cn(
             "flex items-center justify-end gap-1 transition-opacity",
@@ -152,12 +153,13 @@ export function FolderRow({
           <button
             onClick={() => onStar(folder.id)}
             className={cn(
-              "rounded-md p-1.5 transition-colors",
+              "rounded-lg p-2 transition-colors app-focus-ring",
               isStarred
                 ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                 : "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
             )}
             title={isStarred ? "Unstar" : "Star"}
+            aria-label={isStarred ? `Unstar folder ${folder.name}` : `Star folder ${folder.name}`}
           >
             <Star
               className="h-4 w-4"
@@ -168,8 +170,9 @@ export function FolderRow({
           {isArchiveView && canEdit && (
             <button
               onClick={() => onRestore(folder.id)}
-              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               title="Restore"
+              aria-label={`Restore folder ${folder.name}`}
             >
               <RotateCcw className="h-4 w-4" />
             </button>
@@ -178,8 +181,9 @@ export function FolderRow({
           {canEdit && (
             <button
               onClick={() => onDelete(folder)}
-              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               title="Delete"
+              aria-label={`Delete folder ${folder.name}`}
             >
               <Trash2 className="h-4 w-4" />
             </button>

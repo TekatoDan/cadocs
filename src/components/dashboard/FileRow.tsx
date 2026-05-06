@@ -161,13 +161,14 @@ export function FileRow({
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
         "group cursor-pointer border-b border-slate-100 transition-colors dark:border-navy-800",
-        "hover:bg-slate-50 dark:hover:bg-navy-800/50",
+        "hover:bg-indigo-50/40 dark:hover:bg-navy-800/50",
+        isSelected && "bg-indigo-50/60 dark:bg-indigo-900/20",
         isDragging && "opacity-50"
       )}
       onClick={() => !isRenaming && onPreview(file)}
     >
       {/* Select */}
-      <td className="px-4 py-3">
+      <td className="px-5 py-4">
         <input
           type="checkbox"
           checked={isSelected}
@@ -179,15 +180,15 @@ export function FileRow({
       </td>
 
       {/* Name */}
-      <td className="px-4 py-3">
+      <td className="px-4 py-4">
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-white/70",
               iconBg
             )}
           >
-            <FileIcon className={cn("h-4 w-4", iconColor)} />
+            <FileIcon className={cn("h-5 w-5 stroke-[1.8]", iconColor)} />
           </div>
           <div className="flex items-center gap-2 truncate">
             {isRenaming ? (
@@ -206,7 +207,7 @@ export function FileRow({
                 )}
               />
             ) : (
-              <span className="truncate text-sm font-medium text-slate-900 dark:text-white">
+              <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                 {file.name}
               </span>
             )}
@@ -219,27 +220,27 @@ export function FileRow({
 
       {/* Owner */}
       {columns.owner && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           {getOwnerName(file.created_by, teamMembers, currentUserId)}
         </td>
       )}
 
       {/* Last Modified */}
       {columns.lastModified && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           {formatTimeAgo(file.created_at)}
         </td>
       )}
 
       {/* Size */}
       {columns.size && (
-        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+        <td className="px-4 py-4 text-sm font-medium text-slate-500 dark:text-slate-400">
           {formatSize(file.size_bytes)}
         </td>
       )}
 
       {/* Actions */}
-      <td className="px-4 py-3">
+      <td className="px-5 py-4">
         <div
           className={cn(
             "flex items-center justify-end gap-1 transition-opacity",
@@ -250,12 +251,13 @@ export function FileRow({
           <button
             onClick={() => onStar(file.id)}
             className={cn(
-              "rounded-md p-1.5 transition-colors",
+              "rounded-lg p-2 transition-colors app-focus-ring",
               isStarred
                 ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                 : "text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
             )}
             title={isStarred ? "Unstar" : "Star"}
+            aria-label={isStarred ? `Unstar file ${file.name}` : `Star file ${file.name}`}
           >
             <Star
               className="h-4 w-4"
@@ -266,8 +268,9 @@ export function FileRow({
           {isArchiveView && canEdit && (
             <button
               onClick={() => onRestore(file.id)}
-              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               title="Restore"
+              aria-label={`Restore file ${file.name}`}
             >
               <RotateCcw className="h-4 w-4" />
             </button>
@@ -279,8 +282,9 @@ export function FileRow({
                 setEditingName(file.name);
                 setIsRenaming(true);
               }}
-              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
+              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
               title="Rename"
+              aria-label={`Rename file ${file.name}`}
             >
               <Edit2 className="h-4 w-4" />
             </button>
@@ -288,8 +292,9 @@ export function FileRow({
 
           <button
             onClick={() => onDownload(file.storage_path, file.name)}
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
+            className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
             title="Download"
+            aria-label={`Download file ${file.name}`}
           >
             <Download className="h-4 w-4" />
           </button>
@@ -297,8 +302,9 @@ export function FileRow({
           {canEdit && (
             <button
               onClick={() => onDelete(file)}
-              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               title="Delete"
+              aria-label={`Delete file ${file.name}`}
             >
               <Trash2 className="h-4 w-4" />
             </button>

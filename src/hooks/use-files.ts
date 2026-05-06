@@ -64,7 +64,11 @@ export function useUploadDocument() {
       const record = await uploadDocument(formData);
 
       if (extractedText) {
-        await saveDocumentContent(record.id, extractedText);
+        try {
+          await saveDocumentContent(record.id, extractedText);
+        } catch (error) {
+          console.warn("File uploaded, but search indexing failed:", error);
+        }
       }
 
       return record;

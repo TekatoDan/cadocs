@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
+const STORAGE_BUCKET = "Cadocs-Bucket";
+
 // Helper to convert Prisma BigInt to number for JSON serialization
 function serializeFile(file: any): UploadedFileRecord {
   return {
@@ -144,6 +146,10 @@ export async function uploadDocument(
   const folderId = (formData.get("folderId") as string) || null;
   const isPrivate = formData.get("isPrivate") === "true";
 
+  if (!file || !teamId) {
+    throw new Error("Upload is missing the file or destination team.");
+  }
+
   // Check duplicate
   const existing = await prisma.file.findFirst({
     where: {
@@ -163,14 +169,21 @@ export async function uploadDocument(
 
   const arrayBuffer = await file.arrayBuffer();
   const { error: uploadError } = await supabase.storage
-    .from("Cadocs-Bucket")
+    .from(STORAGE_BUCKET)
     .upload(storagePath, arrayBuffer, {
       cacheControl: "3600",
       upsert: false,
       contentType: file.type,
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) {
+    console.error("Supabase storage upload failed:", {
+      bucket: STORAGE_BUCKET,
+      storagePath,
+      message: uploadError.message,
+    });
+    throw new Error(`Storage upload failed: ${uploadError.message}`);
+  }
 
   // Create DB record via Prisma
   try {
@@ -189,7 +202,7 @@ export async function uploadDocument(
     });
     return serializeFile(record);
   } catch (dbError: any) {
-    await supabase.storage.from("Cadocs-Bucket").remove([storagePath]);
+    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
     throw new Error(dbError.message);
   }
 }

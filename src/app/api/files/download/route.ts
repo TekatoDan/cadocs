@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const upstream = await fetchStorageFile(file.storagePath);
 
     if (!upstream.ok || !upstream.body) {
-      return new Response("Unable to load file preview", {
+      return new Response("Unable to load file download", {
         status: upstream.status || 502,
       });
     }
@@ -33,14 +33,17 @@ export async function GET(request: NextRequest) {
     return new Response(upstream.body, {
       status: 200,
       headers: {
-        "Content-Type": file.mimeType || upstream.headers.get("Content-Type") || "application/octet-stream",
-        "Cache-Control": "private, max-age=60",
-        "Content-Disposition": encodeContentDisposition(file.name, "inline"),
+        "Content-Type":
+          file.mimeType ||
+          upstream.headers.get("Content-Type") ||
+          "application/octet-stream",
+        "Cache-Control": "private, no-store",
+        "Content-Disposition": encodeContentDisposition(file.name, "attachment"),
         "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
-    console.error("Failed to load file preview:", error);
+    console.error("Failed to download file:", error);
     return new Response("Unauthorized", { status: 401 });
   }
 }

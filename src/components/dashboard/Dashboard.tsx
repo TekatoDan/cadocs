@@ -6,7 +6,7 @@ import { useDefaultTeam, useTeamRole, useTeamMembers } from "@/hooks/use-teams";
 import { useFiles, useRecentFiles, useStarredFiles, useMoveDocument } from "@/hooks/use-files";
 import { useFolders, useStarredFolders, useMoveFolder, useGetArchiveFolder } from "@/hooks/use-folders";
 import { useSearchDocuments } from "@/hooks/use-search";
-import { Loader2, LogOut, Clock } from "lucide-react";
+import { Loader2, LogOut, Clock, Sparkles, Star } from "lucide-react";
 import type {
   FolderRecord,
   UploadedFileRecord,
@@ -26,7 +26,6 @@ import { NewFolderModal } from "./NewFolderModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PersonalInfoModal } from "./PersonalInfoModal";
 import { AdminPanel } from "@/components/admin/AdminPanel";
-import { getSignedDownloadUrl } from "@/app/actions/storage";
 import { useCreateFolder, useDeleteFolder, useArchiveFolderMutation } from "@/hooks/use-folders";
 import { useDeleteDocument, useArchiveDocument, useRestoreDocument } from "@/hooks/use-files";
 import { useRestoreFolder } from "@/hooks/use-folders";
@@ -372,18 +371,14 @@ export default function Dashboard() {
   }, []);
 
   // Download handler
-  const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
-    try {
-      const signedUrl = await getSignedDownloadUrl(storagePath);
-      const link = document.createElement("a");
-      link.href = signedUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Failed to download:", err);
-    }
+  const handleDownload = useCallback((storagePath: string, fileName: string) => {
+    const params = new URLSearchParams({ path: storagePath });
+    const link = document.createElement("a");
+    link.href = `/api/files/download?${params.toString()}`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }, []);
 
   // Delete handlers
@@ -508,7 +503,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC] font-sans text-slate-800 dark:bg-slate-950 dark:text-slate-200">
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
@@ -555,7 +550,7 @@ export default function Dashboard() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-navy-950 relative z-10">
+      <main className="relative z-10 flex min-w-0 flex-1 flex-col bg-[#F8FAFC] dark:bg-navy-950">
         <Header
           title={title}
           searchQuery={searchQuery}
@@ -570,7 +565,7 @@ export default function Dashboard() {
           onMobileMenuOpen={() => setIsMobileMenuOpen(true)}
         />
 
-        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-transparent">
+        <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#eef3f8_100%)] p-4 dark:bg-transparent md:p-6">
           {showAdminPanel ? (
             <AdminPanel
               teamId={teamId!}
@@ -578,29 +573,13 @@ export default function Dashboard() {
               currentUserId={user?.id}
             />
           ) : (
-            <div className="max-w-7xl mx-auto animate-fade-up space-y-4">
-              <section className="app-surface-soft px-4 py-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Quick Access
-                  </span>
-                  {quickAccessFiles.length === 0 ? (
-                    <span className="text-sm text-slate-500 dark:text-slate-400">No files yet.</span>
-                  ) : (
-                    quickAccessFiles.map((file) => (
-                      <button
-                        key={file.id}
-                        className="app-muted-button py-1.5 text-xs"
-                        onClick={() => setPreviewFile(file)}
-                      >
-                        {file.name}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </section>
+            <div className="mx-auto max-w-7xl animate-fade-up space-y-5">
+              <QuickAccessSection
+                files={quickAccessFiles}
+                onOpenFile={setPreviewFile}
+              />
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <BreadcrumbNav
                   folderPath={folderPath}
                   onNavigateUp={navigateUp}
@@ -731,5 +710,52 @@ export default function Dashboard() {
         onClose={() => setShowPersonalInfoModal(false)}
       />
     </div>
+  );
+}
+
+function QuickAccessSection({
+  files,
+  onOpenFile,
+}: {
+  files: UploadedFileRecord[];
+  onOpenFile: (file: UploadedFileRecord) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-navy-700/70 dark:bg-navy-900/80">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60">
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-[180px]">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Quick Access
+          </h2>
+          {files.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Star files or folders to access them quickly here.
+            </p>
+          )}
+        </div>
+        {files.length === 0 ? (
+          <div className="ml-auto flex min-w-0 items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-navy-700 dark:bg-navy-800/50 dark:text-slate-400">
+            <Star className="h-4 w-4" aria-hidden="true" />
+            <span>No quick access files yet</span>
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {files.map((file) => (
+              <button
+                key={file.id}
+                className="app-focus-ring inline-flex max-w-[220px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-700 hover:shadow-md dark:border-navy-700 dark:bg-navy-900 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:text-indigo-300"
+                onClick={() => onOpenFile(file)}
+              >
+                <Star className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                <span className="truncate">{file.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

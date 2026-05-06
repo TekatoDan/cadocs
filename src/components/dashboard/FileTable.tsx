@@ -142,11 +142,12 @@ export function FileTable({
   };
 
   return (
-    <div className="overflow-hidden app-surface">
-      <table className="w-full">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-navy-700/80 dark:bg-navy-900">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[860px]">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 dark:border-navy-700 dark:bg-navy-800/50">
-            <th className="px-4 py-3 text-left">
+          <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-navy-700 dark:bg-navy-800/60">
+            <th className="w-12 px-5 py-4 text-left">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -155,45 +156,45 @@ export function FileTable({
                 className="app-focus-ring h-4 w-4 rounded border-slate-300 text-indigo-600"
               />
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <button
                 onClick={() => onSortChange("name")}
-                className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
               >
                 Name {getSortIcon("name")}
               </button>
             </th>
             {columns.owner && (
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("owner")}
-                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                  className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
                 >
                   Owner {getSortIcon("owner")}
                 </button>
               </th>
             )}
             {columns.lastModified && (
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("lastModified")}
-                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                  className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
                 >
                   Last Modified {getSortIcon("lastModified")}
                 </button>
               </th>
             )}
             {columns.size && (
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => onSortChange("size")}
-                  className="app-focus-ring inline-flex items-center gap-1 rounded-md"
+                  className="app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:text-slate-900 dark:hover:text-white"
                 >
                   Size {getSortIcon("size")}
                 </button>
               </th>
             )}
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Actions
             </th>
           </tr>
@@ -218,14 +219,14 @@ export function FileTable({
                   1
                 }
               >
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-navy-800">
-                    <FolderPlus className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+                <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 ring-1 ring-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60">
+                    <FolderPlus className="h-8 w-8" />
                   </div>
-                  <h3 className="mt-4 text-sm font-medium text-slate-900 dark:text-white">
+                  <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">
                     This folder is empty
                   </h3>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
                     Create a folder or upload files to get started.
                   </p>
                   {canEdit && !isSpecialView && (
@@ -233,8 +234,8 @@ export function FileTable({
                       <button
                         onClick={onCreateFolder}
                         className={cn(
-                          "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                          "border border-slate-200 text-slate-700 hover:bg-slate-50",
+                          "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+                          "border border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-700 hover:shadow-sm",
                           "dark:border-navy-600 dark:text-slate-300 dark:hover:bg-navy-800"
                         )}
                       >
@@ -244,8 +245,8 @@ export function FileTable({
                       <button
                         onClick={onTriggerUpload}
                         className={cn(
-                          "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors",
-                          "bg-indigo-600 hover:bg-indigo-700"
+                          "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all",
+                          "bg-indigo-600 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md"
                         )}
                       >
                         <Upload className="h-4 w-4" />
@@ -312,6 +313,7 @@ export function FileTable({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

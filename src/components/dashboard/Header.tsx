@@ -166,32 +166,33 @@ export default function Header({
   }, [activeSuggestionIndex, recentSearches]);
 
   return (
-    <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between border-b border-slate-200/50 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-navy-800/50 dark:bg-navy-950/80 sm:px-6">
+    <header className="sticky top-0 z-10 flex min-h-20 flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl dark:border-navy-800/70 dark:bg-navy-950/85 sm:flex-nowrap sm:px-6">
       {/* Left side */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMobileMenuOpen}
-          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 md:hidden dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-slate-200"
+          className="app-focus-ring rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 md:hidden dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-slate-200"
+          aria-label="Open sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">
+        <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
           {title}
         </h1>
       </div>
 
       {/* Right side */}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
         {/* Search */}
         <div
           ref={searchContainerRef}
-          className="relative hidden sm:flex"
+          className="relative order-last flex w-full sm:order-none sm:w-auto"
         >
-          <div className="relative flex items-center">
+          <div className="relative flex w-full items-center sm:w-auto">
             {isSearching ? (
-              <Loader2 className="absolute left-3 h-4 w-4 animate-spin text-slate-400" />
+              <Loader2 className="absolute left-4 h-4 w-4 animate-spin text-slate-400" />
             ) : (
-              <Search className="absolute left-3 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-4 h-4 w-4 text-slate-400" />
             )}
             <input
               ref={searchInputRef}
@@ -204,13 +205,13 @@ export default function Header({
                 setActiveSuggestionIndex(-1);
               }}
               onKeyDown={handleSearchKeyDown}
-              className="app-focus-ring w-48 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-10 text-sm text-slate-900 transition-all duration-200 placeholder:text-slate-400 focus:w-72 focus:border-blue-300 focus:bg-white dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-600 dark:focus:bg-navy-900 dark:focus:ring-blue-900/30"
+              className="app-focus-ring h-11 w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-2 pl-11 pr-11 text-sm font-medium text-slate-900 shadow-inner transition-all duration-200 placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:shadow-sm dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-600 dark:focus:bg-navy-900 dark:focus:ring-indigo-900/30 sm:w-56 sm:focus:w-80"
             />
             {/* Filter button */}
             <div ref={filterDropdownRef} className="absolute right-2">
               <button
                 onClick={() => setShowSearchFilters(!showSearchFilters)}
-                className={`rounded-lg p-1 transition-colors ${
+                className={`app-focus-ring rounded-xl p-1.5 transition-colors ${
                   searchFilters.fileType ||
                   searchFilters.dateModified ||
                   searchFilters.owner ||
@@ -220,13 +221,14 @@ export default function Header({
                     : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
                 title="Search filters"
+                aria-label="Search filters"
               >
                 <Filter className="h-4 w-4" />
               </button>
 
               {/* Filter dropdown */}
               {showSearchFilters && (
-                <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-navy-700 dark:bg-navy-900">
+                <div className="absolute right-0 top-full mt-3 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-navy-700 dark:bg-navy-900">
                   <div className="space-y-3">
                     {/* File Type */}
                     <div>
@@ -385,11 +387,11 @@ export default function Header({
         </div>
 
         {activeFilterEntries.length > 0 && (
-          <div className="hidden lg:flex items-center gap-1.5">
+          <div className="hidden items-center gap-1.5 lg:flex">
             {activeFilterEntries.slice(0, 3).map((entry) => (
               <span
                 key={entry}
-                className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:border-navy-700 dark:bg-navy-800 dark:text-slate-300"
+                className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
               >
                 {entry}
               </span>
@@ -400,8 +402,9 @@ export default function Header({
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-slate-200"
+          className="app-focus-ring rounded-xl border border-transparent p-2 text-slate-500 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-700 hover:shadow-sm dark:text-slate-400 dark:hover:border-navy-700 dark:hover:bg-navy-800 dark:hover:text-slate-200"
           title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
         >
           {theme === "light" ? (
             <Moon className="h-5 w-5" />
@@ -414,14 +417,15 @@ export default function Header({
         <div ref={columnDropdownRef} className="relative">
           <button
             onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-slate-200"
+            className="app-focus-ring rounded-xl border border-transparent p-2 text-slate-500 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-700 hover:shadow-sm dark:text-slate-400 dark:hover:border-navy-700 dark:hover:bg-navy-800 dark:hover:text-slate-200"
             title="Column settings"
+            aria-label="Column settings"
           >
             <Settings2 className="h-5 w-5" />
           </button>
 
           {showColumnDropdown && (
-            <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-navy-700 dark:bg-navy-900">
+            <div className="absolute right-0 top-full mt-3 w-52 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-navy-700 dark:bg-navy-900">
               <div className="mb-2 text-xs font-medium text-slate-400 dark:text-slate-500">
                 Visible columns
               </div>

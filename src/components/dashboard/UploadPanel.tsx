@@ -25,7 +25,12 @@ export function UploadPanel({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isPrivateUpload, setIsPrivateUpload] = useState(false);
   const [queue, setQueue] = useState<
-    { id: string; name: string; status: "queued" | "extracting" | "uploading" | "done" | "error" }[]
+    {
+      id: string;
+      name: string;
+      status: "queued" | "extracting" | "uploading" | "done" | "error";
+      message?: string;
+    }[]
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadDocument();
@@ -37,6 +42,7 @@ export function UploadPanel({
         id: `${file.name}-${file.size}-${file.lastModified}`,
         name: file.name,
         status: "queued" as const,
+        message: undefined,
       }));
       setQueue(initialQueue);
 
@@ -71,9 +77,16 @@ export function UploadPanel({
           setQueue((prev) =>
             prev.map((item) => (item.id === queueId ? { ...item, status: "done" } : item))
           );
-        } catch {
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Upload failed. Please try again.";
+          console.error(`Upload failed for ${file.name}:`, error);
           setQueue((prev) =>
-            prev.map((item) => (item.id === queueId ? { ...item, status: "error" } : item))
+            prev.map((item) =>
+              item.id === queueId ? { ...item, status: "error", message } : item
+            )
           );
         }
       }
@@ -213,19 +226,26 @@ export function UploadPanel({
             </h3>
             <ul className="space-y-1.5">
               {queue.map((item) => (
-                <li key={item.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs dark:bg-navy-900">
-                  <span className="truncate pr-3 text-slate-700 dark:text-slate-200">{item.name}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-semibold ${
-                      item.status === "done"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                        : item.status === "error"
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                    }`}
-                  >
-                    {getStatusLabel(item.status)}
-                  </span>
+                <li key={item.id} className="rounded-lg bg-white px-3 py-2 text-xs dark:bg-navy-900">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-slate-700 dark:text-slate-200">{item.name}</span>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${
+                        item.status === "done"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : item.status === "error"
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      }`}
+                    >
+                      {getStatusLabel(item.status)}
+                    </span>
+                  </div>
+                  {item.status === "error" && item.message && (
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-red-600 dark:text-red-300">
+                      {item.message}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

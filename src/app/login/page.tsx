@@ -224,7 +224,6 @@ export default function LoginPage() {
         <main className="grid flex-1 bg-transparent lg:grid-cols-[minmax(0,1.38fr)_minmax(420px,0.82fr)]">
           <HeroSection />
           <section className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:px-14">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#dbeafe_0,transparent_44%)] opacity-60 blur-3xl" aria-hidden="true" />
             <LoginCard
               error={error}
               fieldErrors={fieldErrors}
@@ -393,7 +392,7 @@ function LoginCard({
   username,
 }: LoginCardProps) {
   return (
-    <div className="relative z-10 w-full max-w-[560px] rounded-[28px] border border-white/80 bg-white/95 px-5 py-8 shadow-[0_28px_70px_rgba(7,25,70,0.16)] ring-1 ring-blue-100/70 backdrop-blur-xl sm:px-10 sm:py-10 lg:px-12">
+    <div className="relative z-10 w-full max-w-[560px] rounded-[28px] border border-white/70 bg-white/72 px-5 py-8 shadow-[0_28px_70px_rgba(7,25,70,0.18)] ring-1 ring-blue-100/50 backdrop-blur-2xl sm:px-10 sm:py-10 lg:px-12">
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" aria-hidden="true" />
       <div className="text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-blue-100 text-[#0b53d0] shadow-inner ring-1 ring-blue-100">
