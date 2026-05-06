@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
+import { STORAGE_BUCKET } from "@/lib/storage-bucket";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 const PRIVATE_VISIBILITY = "__VISIBILITY_PRIVATE__";
-const STORAGE_BUCKET = "Cadocs-Bucket";
 
 export class FileAccessAuthError extends Error {
   constructor() {

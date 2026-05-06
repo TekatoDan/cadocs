@@ -2,9 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
+import { STORAGE_BUCKET } from "@/lib/storage-bucket";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
-const STORAGE_BUCKET = "Cadocs-Bucket";
 const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
 const MIN_FILE_NAME_LENGTH = 16;
 
@@ -259,7 +259,10 @@ export async function uploadDocument(
       });
       return {
         ok: false,
-        error: `Storage upload failed: ${uploadError.message}`,
+        error:
+          uploadError.message === "Bucket not found"
+            ? `Storage bucket "${STORAGE_BUCKET}" was not found. Create it in Supabase Storage or set SUPABASE_STORAGE_BUCKET to the existing bucket id.`
+            : `Storage upload failed: ${uploadError.message}`,
       };
     }
 
@@ -394,7 +397,7 @@ export async function getSignedDownloadUrl(
 ): Promise<string> {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase.storage
-    .from("Cadocs-Bucket")
+    .from(STORAGE_BUCKET)
     .createSignedUrl(storagePath, expiresInSeconds);
 
   if (error) throw new Error(error.message);
@@ -420,7 +423,7 @@ export async function deleteDocument(
   const supabase = await getSupabaseClient();
 
   const { error: storageError } = await supabase.storage
-    .from("Cadocs-Bucket")
+    .from(STORAGE_BUCKET)
     .remove([storagePath]);
   if (storageError) throw new Error(storageError.message);
 
