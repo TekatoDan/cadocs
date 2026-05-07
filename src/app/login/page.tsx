@@ -218,7 +218,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,#eaf4ff_0,#f7fbff_34%,#edf3f9_100%)] text-[#071946]">
+    <div
+      className="min-h-screen overflow-hidden bg-[#071946] bg-cover bg-center text-[#071946]"
+      style={{
+        backgroundImage:
+          "linear-gradient(90deg, rgba(238,246,255,0.72) 0%, rgba(238,246,255,0.48) 48%, rgba(238,246,255,0.22) 100%), linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.08) 44%, rgba(4,18,67,0.22) 100%), url('/login-background.png')",
+      }}
+    >
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="grid flex-1 bg-transparent lg:grid-cols-[minmax(0,1.38fr)_minmax(420px,0.82fr)]">
@@ -252,9 +258,8 @@ export default function LoginPage() {
 
 function Header() {
   return (
-    <header className="relative z-20 border-b border-white/70 bg-white/90 shadow-[0_14px_40px_rgba(15,35,80,0.08)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent" aria-hidden="true" />
-      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-5 py-4 sm:px-10 lg:flex-row lg:items-center lg:justify-between lg:px-16 xl:px-20">
+    <header className="relative z-20 px-4 pt-4 sm:px-8 lg:px-14">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 rounded-2xl border border-white/70 bg-white/25 px-5 py-4 text-[#061a55] shadow-[0_16px_38px_rgba(7,25,70,0.09)] ring-1 ring-white/50 backdrop-blur-sm sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
         <div className="group flex min-w-0 items-center gap-4 sm:gap-7">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white shadow-[0_10px_26px_rgba(7,25,70,0.12)] ring-1 ring-slate-200/80 transition-transform duration-300 group-hover:-translate-y-0.5 sm:h-24 sm:w-24">
             <div className="relative h-[88%] w-[88%]">
@@ -268,12 +273,12 @@ function Header() {
               />
             </div>
           </div>
-          <div className="h-14 w-px bg-gradient-to-b from-transparent via-slate-300/90 to-transparent sm:h-16" aria-hidden="true" />
+          <div className="h-14 w-px bg-gradient-to-b from-transparent via-[#061a55]/30 to-transparent sm:h-16" aria-hidden="true" />
           <div className="min-w-0">
             <p className="font-heading text-3xl font-extrabold leading-none tracking-normal text-[#061a55] sm:text-5xl">
               CADOCS
             </p>
-            <p className="mt-1 max-w-[13rem] text-[0.68rem] font-medium uppercase leading-snug tracking-normal text-slate-500 sm:mt-2 sm:max-w-none sm:text-sm">
+            <p className="mt-1 max-w-[13rem] text-[0.68rem] font-bold uppercase leading-snug tracking-normal text-[#132a5f] sm:mt-2 sm:max-w-none sm:text-sm">
               Information Management System (IMS)
             </p>
           </div>
@@ -281,15 +286,15 @@ function Header() {
 
         <a
           href="#"
-          className="app-focus-ring group flex w-fit items-center gap-3 self-start rounded-2xl border border-blue-100/90 bg-gradient-to-br from-white to-blue-50/70 px-4 py-3 text-[#061a55] shadow-[0_10px_28px_rgba(3,75,217,0.08)] transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-300/80 hover:shadow-[0_16px_36px_rgba(3,75,217,0.15)] lg:self-center"
+          className="app-focus-ring group flex w-fit items-center gap-3 self-start rounded-xl px-2 py-2 text-[#061a55] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/25 lg:self-center"
           aria-label="Contact ICT Support"
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#0b53d0] shadow-sm ring-1 ring-blue-100 transition-colors duration-300 group-hover:bg-[#0b53d0] group-hover:text-white">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/70 text-[#0b53d0] shadow-sm ring-1 ring-white/70 transition-colors duration-300 group-hover:bg-[#0b53d0] group-hover:text-white">
             <Headphones className="h-6 w-6 stroke-[1.8]" aria-hidden="true" />
           </span>
           <span className="text-sm leading-tight">
             <span className="block font-semibold">Need help?</span>
-            <span className="block font-medium text-slate-500 transition-colors duration-300 group-hover:text-[#0b53d0]">
+            <span className="block font-bold text-[#183262] transition-colors duration-300 group-hover:text-[#0b53d0]">
               Contact ICT Support
             </span>
           </span>
@@ -301,16 +306,7 @@ function Header() {
 
 function HeroSection() {
   return (
-    <section
-      className="relative flex min-h-[620px] items-center justify-center overflow-hidden bg-sky-100 px-6 py-14 sm:px-10 lg:min-h-0 lg:px-14"
-      style={{
-        backgroundImage:
-          "linear-gradient(90deg, rgba(241,247,255,0.08), rgba(241,247,255,0.5)), url('/login-background.png')",
-        backgroundPosition: "left center",
-        backgroundSize: "cover",
-      }}
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-blue-50/20 to-[#061a55]/10" aria-hidden="true" />
+    <section className="relative flex min-h-[620px] items-center justify-center overflow-hidden px-6 py-14 sm:px-10 lg:min-h-0 lg:px-14">
       <div className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center">
         <div className="relative flex h-36 w-36 items-center justify-center rounded-full bg-white/50 shadow-[0_18px_44px_rgba(7,25,70,0.16)] ring-1 ring-white/70 backdrop-blur-sm sm:h-44 sm:w-44">
           <div className="relative h-[88%] w-[88%]">
@@ -392,28 +388,28 @@ function LoginCard({
   username,
 }: LoginCardProps) {
   return (
-    <div className="relative z-10 w-full max-w-[560px] rounded-[28px] border border-white/70 bg-white/72 px-5 py-8 shadow-[0_28px_70px_rgba(7,25,70,0.18)] ring-1 ring-blue-100/50 backdrop-blur-2xl sm:px-10 sm:py-10 lg:px-12">
+    <div className="relative z-10 w-full max-w-[560px] rounded-[28px] border border-white/70 bg-white/25 px-5 py-8 text-[#061a55] shadow-[0_28px_70px_rgba(7,25,70,0.18)] ring-1 ring-white/50 backdrop-blur-sm sm:px-10 sm:py-10 lg:px-12">
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" aria-hidden="true" />
       <div className="text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-50 to-blue-100 text-[#0b53d0] shadow-inner ring-1 ring-blue-100">
           <UserRound className="h-11 w-11 stroke-[1.65]" aria-hidden="true" />
         </div>
-        <h2 className="mt-6 font-heading text-3xl font-bold leading-tight tracking-normal text-[#061a55]">
+        <h2 className="mt-6 font-heading text-3xl font-extrabold leading-tight tracking-normal text-[#031243] drop-shadow-sm">
           Welcome Back!
         </h2>
-        <p className="mx-auto mt-3 max-w-sm text-[0.95rem] font-medium leading-7 text-slate-500">
+        <p className="mx-auto mt-3 max-w-sm text-[0.95rem] font-bold leading-7 text-[#183262]">
           Please sign in to your account to continue to IMS.
         </p>
       </div>
 
       <form onSubmit={handleEmailAuth} className="mt-10 space-y-6" noValidate>
         <div>
-          <label htmlFor="username" className="mb-3 block text-sm font-semibold text-[#071946]">
+          <label htmlFor="username" className="mb-3 block text-sm font-bold text-[#031243]">
             Username
           </label>
           <div className="relative">
             <UserRound
-              className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500 stroke-[1.65]"
+              className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#183262] stroke-[1.65]"
               aria-hidden="true"
             />
             <input
@@ -435,12 +431,12 @@ function LoginCard({
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-3 block text-sm font-semibold text-[#071946]">
+          <label htmlFor="password" className="mb-3 block text-sm font-bold text-[#031243]">
             Password
           </label>
           <div className="relative">
             <Lock
-              className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500 stroke-[1.65]"
+              className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#183262] stroke-[1.65]"
               aria-hidden="true"
             />
             <input
@@ -459,7 +455,7 @@ function LoginCard({
               type="button"
               onClick={() => setShowPassword((current) => !current)}
               disabled={loading}
-              className="app-focus-ring absolute inset-y-1 right-2 flex w-11 items-center justify-center rounded-xl text-slate-500 transition-colors duration-200 hover:bg-blue-50 hover:text-[#0b53d0] disabled:opacity-60"
+              className="app-focus-ring absolute inset-y-1 right-2 flex w-11 items-center justify-center rounded-xl text-[#183262] transition-colors duration-200 hover:bg-blue-50 hover:text-[#0b53d0] disabled:opacity-60"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -474,7 +470,7 @@ function LoginCard({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 text-sm font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 text-sm font-bold text-[#183262] sm:flex-row sm:items-center sm:justify-between">
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -510,9 +506,9 @@ function LoginCard({
       </form>
 
       <div className="my-6 flex items-center gap-5">
-        <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-sm font-semibold text-slate-500">or</span>
-        <div className="h-px flex-1 bg-slate-200" />
+        <div className="h-px flex-1 bg-white/70" />
+        <span className="text-sm font-bold text-[#183262]">or</span>
+        <div className="h-px flex-1 bg-white/70" />
       </div>
 
       <button
@@ -543,7 +539,7 @@ function LoginCard({
         </div>
       )}
 
-      <p className="mx-auto mt-7 max-w-sm text-center text-sm font-medium leading-6 text-slate-500">
+      <p className="mx-auto mt-7 max-w-sm text-center text-sm font-bold leading-6 text-[#183262]">
         For authorized personnel only.
         <br />
         All activities are monitored and recorded.
@@ -577,7 +573,7 @@ function GoogleIcon() {
 
 function Footer() {
   return (
-    <footer className="bg-[#052b55] text-white">
+    <footer className="relative z-20 bg-[#052b55]/92 text-white backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-5 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-10 lg:px-16">
         <p>All rights reserved.</p>
         <nav aria-label="Footer links" className="flex items-center gap-8">
