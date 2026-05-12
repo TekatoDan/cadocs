@@ -6,7 +6,7 @@ import { useDefaultTeam, useTeamRole, useTeamMembers } from "@/hooks/use-teams";
 import { useFiles, useRecentFiles, useStarredFiles, useMoveDocument } from "@/hooks/use-files";
 import { useFolders, useStarredFolders, useMoveFolder, useGetArchiveFolder } from "@/hooks/use-folders";
 import { useSearchDocuments } from "@/hooks/use-search";
-import { Loader2, LogOut, Clock, Sparkles, Star } from "lucide-react";
+import { LogOut, Clock, Sparkles, Star } from "lucide-react";
 import type {
   FolderRecord,
   UploadedFileRecord,
@@ -26,6 +26,7 @@ import { NewFolderModal } from "./NewFolderModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PersonalInfoModal } from "./PersonalInfoModal";
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { BrandLoader } from "@/components/ui/BrandLoader";
 import { useCreateFolder, useDeleteFolder, useArchiveFolderMutation } from "@/hooks/use-folders";
 import { useDeleteDocument, useArchiveDocument, useRestoreDocument } from "@/hooks/use-files";
 import { useRestoreFolder } from "@/hooks/use-folders";
@@ -491,11 +492,7 @@ export default function Dashboard() {
 
   // Loading state
   if (teamLoading) {
-    return (
-      <div className="flex h-screen bg-slate-50 dark:bg-slate-950 items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400" />
-      </div>
-    );
+    return <BrandLoader className="dark:bg-slate-950" />;
   }
 
   // Viewer role (pending activation)

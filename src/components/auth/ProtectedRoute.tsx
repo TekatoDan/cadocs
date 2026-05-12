@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDefaultTeam, useTeamRole } from "@/hooks/use-teams";
-import { Loader2, Lock, AlertTriangle, Mail } from "lucide-react";
+import { Lock, AlertTriangle, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { BrandLoader } from "@/components/ui/BrandLoader";
 
 export default function ProtectedRoute({
   children,
@@ -81,19 +82,11 @@ export default function ProtectedRoute({
   }
 
   if (isResolvingAccess) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-navy-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
-      </div>
-    );
+    return <BrandLoader />;
   }
 
   if (!session) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-navy-950">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
-      </div>
-    );
+    return <BrandLoader />;
   }
 
   if (role === "pending" || role === "viewer") {

@@ -258,8 +258,8 @@ export default function LoginPage() {
 
 function Header() {
   return (
-    <header className="relative z-20 px-4 pt-4 sm:px-8 lg:px-14">
-      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 rounded-2xl border border-white/70 bg-white/25 px-5 py-4 text-[#061a55] shadow-[0_16px_38px_rgba(7,25,70,0.09)] ring-1 ring-white/50 backdrop-blur-sm sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+    <header className="relative z-20">
+      <div className="flex w-full flex-col gap-5 rounded-b-2xl border-b border-white/70 bg-white/25 px-5 py-4 text-[#061a55] shadow-[0_16px_38px_rgba(7,25,70,0.09)] backdrop-blur-sm sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-14">
         <div className="group flex min-w-0 items-center gap-4 sm:gap-7">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white shadow-[0_10px_26px_rgba(7,25,70,0.12)] ring-1 ring-slate-200/80 transition-transform duration-300 group-hover:-translate-y-0.5 sm:h-24 sm:w-24">
             <div className="relative h-[88%] w-[88%]">
