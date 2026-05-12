@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileText, X, Printer, Download, Loader2 } from "lucide-react";
+import { FileText, X, Printer, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandLoader } from "@/components/ui/BrandLoader";
 import type { UploadedFileRecord } from "@/lib/types";
 
 interface FilePreviewModalProps {
@@ -234,9 +235,10 @@ export default function FilePreviewModal({
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
           {previewLoading && (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-            </div>
+            <BrandLoader
+              className="h-full min-h-[70vh] bg-transparent dark:bg-transparent"
+              label={`Loading preview for ${file.name}`}
+            />
           )}
 
           {previewError && (
