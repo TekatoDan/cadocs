@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { Folder, Star, Trash2, RotateCcw, Loader2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Folder, Star, Trash2, RotateCcw, Loader2, Edit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenameFolder } from "@/hooks/use-folders";
 import type { FolderRecord, TeamMember, ColumnConfig } from "@/lib/types";
 
 interface FolderRowProps {
@@ -77,10 +78,54 @@ export function FolderRow({
   onSelect,
 }: FolderRowProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [editingName, setEditingName] = useState(folder.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const cancelRenameRef = useRef(false);
+  const renameMutation = useRenameFolder();
+
+  useEffect(() => {
+    if (isRenaming) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [isRenaming]);
+
+  const handleRenameSubmit = async () => {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      return;
+    }
+
+    const trimmed = editingName.trim();
+    if (!trimmed || trimmed === folder.name) {
+      setIsRenaming(false);
+      setEditingName(folder.name);
+      return;
+    }
+
+    try {
+      await renameMutation.mutateAsync({ folderId: folder.id, newName: trimmed });
+    } catch {
+      setEditingName(folder.name);
+    }
+    setIsRenaming(false);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleRenameSubmit();
+    } else if (e.key === "Escape") {
+      cancelRenameRef.current = true;
+      setIsRenaming(false);
+      setEditingName(folder.name);
+    }
+  };
 
   return (
     <tr
-      draggable
+      draggable={!isRenaming}
       onDragStart={(e) => onDragStart(e, "folder", folder.id)}
       onDragOver={(e) => onDragOver(e, folder.id)}
       onDragLeave={onDragLeave}
@@ -94,7 +139,7 @@ export function FolderRow({
         isDragOver && "bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-inset ring-indigo-500",
         isDragging && "opacity-50"
       )}
-      onClick={() => onNavigate(folder)}
+      onClick={() => !isRenaming && onNavigate(folder)}
     >
       {/* Select */}
       <td className="px-5 py-4">
@@ -114,9 +159,33 @@ export function FolderRow({
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 transition-colors group-hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800/60">
             <Folder className="h-5 w-5 fill-indigo-100 stroke-[1.8] dark:fill-indigo-900/50" />
           </div>
-          <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={folder.name}>
-            {folder.name}
-          </span>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {isRenaming ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleRenameKeyDown}
+                onBlur={handleRenameSubmit}
+                onClick={(e) => e.stopPropagation()}
+                disabled={renameMutation.isPending}
+                className={cn(
+                  "min-w-0 max-w-full rounded-md border px-2 py-1 text-sm outline-none",
+                  "border-indigo-500 bg-white text-slate-900 ring-2 ring-indigo-500/20",
+                  "dark:bg-navy-900 dark:text-white",
+                  "disabled:opacity-60"
+                )}
+              />
+            ) : (
+              <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={folder.name}>
+                {folder.name}
+              </span>
+            )}
+            {renameMutation.isPending && (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-indigo-500" />
+            )}
+          </div>
         </div>
       </td>
 
@@ -179,14 +248,28 @@ export function FolderRow({
           )}
 
           {canEdit && (
-            <button
-              onClick={() => onDelete(folder)}
-              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-              title="Delete"
-              aria-label={`Delete folder ${folder.name}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  cancelRenameRef.current = false;
+                  setEditingName(folder.name);
+                  setIsRenaming(true);
+                }}
+                className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-navy-700 dark:hover:text-slate-300"
+                title="Rename"
+                aria-label={`Rename folder ${folder.name}`}
+              >
+                <Edit2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onDelete(folder)}
+                className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                title="Delete"
+                aria-label={`Delete folder ${folder.name}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
           )}
         </div>
       </td>

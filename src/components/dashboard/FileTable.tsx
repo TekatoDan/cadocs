@@ -1,7 +1,19 @@
 "use client";
 
 import React from "react";
-import { ArrowDownUp, ArrowUp, ArrowDown, FolderPlus, Upload } from "lucide-react";
+import {
+  ArrowDownUp,
+  ArrowUp,
+  ArrowDown,
+  FolderPlus,
+  Upload,
+  Star,
+  RotateCcw,
+  Trash2,
+  X,
+  Loader2,
+  FileText,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FolderRow } from "@/components/dashboard/FolderRow";
 import { FileRow } from "@/components/dashboard/FileRow";
@@ -47,6 +59,11 @@ interface FileTableProps {
   onSortChange: (column: "name" | "owner" | "lastModified" | "size") => void;
   selectedIds: string[];
   onSelectedIdsChange: (ids: string[]) => void;
+  onBulkStar: () => void;
+  onMergePdfs: () => void;
+  onBulkRestore: () => void;
+  onBulkDelete: () => void;
+  isBulkActionPending: boolean;
 }
 
 function SkeletonRow({ columns }: { columns: ColumnConfig }) {
@@ -117,12 +134,37 @@ export function FileTable({
   onSortChange,
   selectedIds,
   onSelectedIdsChange,
+  onBulkStar,
+  onMergePdfs,
+  onBulkRestore,
+  onBulkDelete,
+  isBulkActionPending,
 }: FileTableProps) {
   const allIds = React.useMemo(
     () => [...folders.map((folder) => folder.id), ...files.map((file) => file.id)],
     [folders, files]
   );
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id));
+  const selectedFileCount = files.filter((file) => selectedIds.includes(file.id)).length;
+  const selectedFolderCount = folders.filter((folder) => selectedIds.includes(folder.id)).length;
+  const selectedPdfCount = files.filter(
+    (file) =>
+      selectedIds.includes(file.id) &&
+      (file.mime_type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
+  ).length;
+  const selectedCount = selectedFileCount + selectedFolderCount;
+  const canMergeSelectedPdfs =
+    selectedPdfCount >= 2 &&
+    selectedFolderCount === 0 &&
+    selectedPdfCount === selectedFileCount;
+  const selectedAreAllStarred =
+    selectedCount > 0 &&
+    files
+      .filter((file) => selectedIds.includes(file.id))
+      .every((file) => starredItems.files.includes(file.id)) &&
+    folders
+      .filter((folder) => selectedIds.includes(folder.id))
+      .every((folder) => starredItems.folders.includes(folder.id));
 
   const toggleSelection = (id: string, checked: boolean) => {
     if (checked) {
@@ -143,6 +185,104 @@ export function FileTable({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-navy-700/80 dark:bg-navy-900">
+      {selectedCount > 0 && (
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-indigo-50/70 px-4 py-3 dark:border-navy-700 dark:bg-indigo-950/20 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {selectedCount} selected
+            <span className="ml-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              {selectedFileCount} file{selectedFileCount !== 1 ? "s" : ""},{" "}
+              {selectedFolderCount} folder{selectedFolderCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onBulkStar}
+              disabled={isBulkActionPending}
+              className={cn(
+                "app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                "border border-slate-200 bg-white text-slate-700 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700",
+                "dark:border-navy-600 dark:bg-navy-900 dark:text-slate-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-300",
+                "disabled:cursor-not-allowed disabled:opacity-60"
+              )}
+            >
+              <Star className="h-3.5 w-3.5" fill={selectedAreAllStarred ? "currentColor" : "none"} />
+              {selectedAreAllStarred ? "Unstar" : "Star"}
+            </button>
+            {selectedPdfCount >= 2 && (
+              <button
+                type="button"
+                onClick={onMergePdfs}
+                disabled={!canMergeSelectedPdfs || isBulkActionPending}
+                className={cn(
+                  "app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "border border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700",
+                  "dark:border-navy-600 dark:bg-navy-900 dark:text-slate-300 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300",
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+                title={
+                  canMergeSelectedPdfs
+                    ? "Merge selected PDFs"
+                    : "Select only PDF files to merge"
+                }
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Merge PDFs
+              </button>
+            )}
+            {isArchiveView && canEdit && (
+              <button
+                type="button"
+                onClick={onBulkRestore}
+                disabled={isBulkActionPending}
+                className={cn(
+                  "app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "border border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700",
+                  "dark:border-navy-600 dark:bg-navy-900 dark:text-slate-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300",
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restore
+              </button>
+            )}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={onBulkDelete}
+                disabled={isBulkActionPending}
+                className={cn(
+                  "app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "border border-red-200 bg-white text-red-600 hover:bg-red-50",
+                  "dark:border-red-900/60 dark:bg-navy-900 dark:text-red-400 dark:hover:bg-red-900/20",
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+              >
+                {isBulkActionPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                {isArchiveView ? "Delete" : "Move to Trash"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onSelectedIdsChange([])}
+              disabled={isBulkActionPending}
+              className={cn(
+                "app-focus-ring inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors",
+                "hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-navy-800 dark:hover:text-slate-200",
+                "disabled:cursor-not-allowed disabled:opacity-60"
+              )}
+              title="Clear selection"
+              aria-label="Clear selection"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
       <table className="w-full min-w-[860px] table-fixed">
         <thead>

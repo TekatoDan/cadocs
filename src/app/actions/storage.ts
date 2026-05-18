@@ -185,6 +185,17 @@ export async function deleteFolder(folderId: string): Promise<void> {
   await prisma.folder.delete({ where: { id: folderId } });
 }
 
+export async function updateFolderName(
+  folderId: string,
+  newName: string
+): Promise<void> {
+  await getAuthUser();
+  await prisma.folder.update({
+    where: { id: folderId },
+    data: { name: newName },
+  });
+}
+
 export async function moveFolder(
   folderId: string,
   newParentId: string | null

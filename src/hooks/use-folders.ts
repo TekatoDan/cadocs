@@ -10,6 +10,7 @@ import {
   restoreFolder,
   moveFolder,
   getArchiveFolder,
+  updateFolderName,
 } from "@/app/actions/storage";
 
 export function useFolders(teamId: string | null, parentId: string | null) {
@@ -70,6 +71,23 @@ export function useDeleteFolder() {
     mutationFn: (folderId: string) => deleteFolder(folderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["folders"] });
+    },
+  });
+}
+
+export function useRenameFolder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      folderId,
+      newName,
+    }: {
+      folderId: string;
+      newName: string;
+    }) => updateFolderName(folderId, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.invalidateQueries({ queryKey: ["search"] });
     },
   });
 }

@@ -10,7 +10,8 @@ export async function searchDocuments(
   filters?: SearchFilters
 ): Promise<SearchResult[]> {
   const user = await getAuthUser();
-  const hasQuery = query.trim().length > 0;
+  const trimmedQuery = query.trim();
+  const hasQuery = trimmedQuery.length > 0;
   const hasFilters =
     filters &&
     Object.values(filters).some(
@@ -81,6 +82,14 @@ export async function searchDocuments(
     extraFilters.name = { contains: filters.tags, mode: "insensitive" };
   }
 
+  const folderFilters: any = {};
+  if (filters?.dateModified && filters.dateModified !== "any") {
+    folderFilters.createdAt = extraFilters.createdAt;
+  }
+  if (filters?.owner && filters.owner !== "anyone") {
+    folderFilters.createdBy = filters.owner;
+  }
+
   const results: SearchResult[] = [];
   const seenFileIds = new Set<string>();
 
@@ -88,7 +97,7 @@ export async function searchDocuments(
     // Search document contents
     const contentMatches = await prisma.documentContent.findMany({
       where: {
-        content: { contains: query, mode: "insensitive" },
+        content: { contains: trimmedQuery, mode: "insensitive" },
         file: {
           teamId,
           status: { not: "archived" },
@@ -118,6 +127,7 @@ export async function searchDocuments(
       seenFileIds.add(match.file.id);
       results.push({
         id: match.id,
+        type: "file",
         content: match.content,
         files: {
           id: match.file.id,
@@ -133,12 +143,48 @@ export async function searchDocuments(
       });
     }
 
+    // Search folder names
+    const archiveFolder = await prisma.folder.findFirst({
+      where: { teamId, parentId: null, name: ".archive" },
+      select: { id: true },
+    });
+
+    const folderMatches = await prisma.folder.findMany({
+      where: {
+        teamId,
+        name: { contains: trimmedQuery, mode: "insensitive" },
+        NOT: [
+          { name: ".archive" },
+          ...(archiveFolder ? [{ parentId: archiveFolder.id }] : []),
+        ],
+        ...folderFilters,
+      },
+      orderBy: { name: "asc" },
+      take: 20,
+    });
+
+    for (const folder of folderMatches) {
+      results.push({
+        id: `folder-${folder.id}`,
+        type: "folder",
+        content: "",
+        folder: {
+          id: folder.id,
+          team_id: folder.teamId,
+          name: folder.name,
+          parent_id: folder.parentId,
+          created_at: folder.createdAt.toISOString(),
+          created_by: folder.createdBy,
+        },
+      });
+    }
+
     // Search file names
     const nameMatches = await prisma.file.findMany({
       where: {
         teamId,
         status: { not: "archived" },
-        name: { contains: query, mode: "insensitive" },
+        name: { contains: trimmedQuery, mode: "insensitive" },
         OR: visibilityFilter,
         ...extraFilters,
       },
@@ -150,6 +196,7 @@ export async function searchDocuments(
         seenFileIds.add(file.id);
         results.push({
           id: `name-${file.id}`,
+          type: "file",
           content: "",
           files: {
             id: file.id,
@@ -181,6 +228,7 @@ export async function searchDocuments(
     for (const file of files) {
       results.push({
         id: file.id,
+        type: "file",
         content: "",
         files: {
           id: file.id,

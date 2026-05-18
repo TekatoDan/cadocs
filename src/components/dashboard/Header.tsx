@@ -197,7 +197,7 @@ export default function Header({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search files..."
+              placeholder="Search files and folders..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onFocus={() => {

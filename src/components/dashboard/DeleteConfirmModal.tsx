@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface DeleteConfirmModalProps {
   itemName: string;
-  itemType: "file" | "folder";
+  itemType: "file" | "folder" | "items";
   isPermanent: boolean;
   open: boolean;
   onClose: () => void;
@@ -25,6 +25,12 @@ export function DeleteConfirmModal({
 }: DeleteConfirmModalProps) {
   if (!open) return null;
 
+  const targetLabel =
+    itemType === "items" ? "selected items" : `the ${itemType}`;
+  const actionLabel = isPermanent
+    ? `permanently delete ${targetLabel}`
+    : `move ${targetLabel} to trash`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
@@ -41,9 +47,7 @@ export function DeleteConfirmModal({
               {isPermanent ? "Permanently Delete" : "Move to Trash"}
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Are you sure you want to{" "}
-              {isPermanent ? "permanently delete" : "move to trash"} the{" "}
-              {itemType}{" "}
+              Are you sure you want to {actionLabel}{" "}
               <span className="font-medium text-slate-700 dark:text-slate-300">
                 &quot;{itemName}&quot;
               </span>
@@ -51,8 +55,10 @@ export function DeleteConfirmModal({
             </p>
             {isPermanent && (
               <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-400">
-                This action cannot be undone. The {itemType} and all its contents
-                will be permanently removed.
+                This action cannot be undone.{" "}
+                {itemType === "items"
+                  ? "The selected items and their contents will be permanently removed."
+                  : `The ${itemType} and all its contents will be permanently removed.`}
               </p>
             )}
           </div>

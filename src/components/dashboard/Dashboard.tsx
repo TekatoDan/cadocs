@@ -23,6 +23,7 @@ import { UploadPanel } from "./UploadPanel";
 import { SearchResults } from "./SearchResults";
 import FilePreviewModal from "./FilePreviewModal";
 import { NewFolderModal } from "./NewFolderModal";
+import { PdfMergeModal } from "./PdfMergeModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { PersonalInfoModal } from "./PersonalInfoModal";
 import { AdminPanel } from "@/components/admin/AdminPanel";
@@ -60,6 +61,8 @@ export default function Dashboard() {
   const [previewFile, setPreviewFile] = useState<UploadedFileRecord | null>(null);
   const [fileToDelete, setFileToDelete] = useState<UploadedFileRecord | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderRecord | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [showPdfMergeModal, setShowPdfMergeModal] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -213,6 +216,25 @@ export default function Dashboard() {
     });
     return arr;
   }, [displayFolders, sortBy, sortDirection, teamMembers]);
+
+  const selectedFiles = useMemo(
+    () => sortedFiles.filter((file) => selectedIds.includes(file.id)),
+    [selectedIds, sortedFiles]
+  );
+  const selectedFolders = useMemo(
+    () => sortedFolders.filter((folder) => selectedIds.includes(folder.id)),
+    [selectedIds, sortedFolders]
+  );
+  const selectedPdfFiles = useMemo(
+    () =>
+      selectedFiles.filter(
+        (file) =>
+          file.mime_type === "application/pdf" ||
+          file.name.toLowerCase().endsWith(".pdf")
+      ),
+    [selectedFiles]
+  );
+  const selectedItemCount = selectedFiles.length + selectedFolders.length;
 
   const title = showAdminPanel
     ? "Team Management"
@@ -371,6 +393,48 @@ export default function Dashboard() {
     }));
   }, []);
 
+  const handleBulkStar = useCallback(() => {
+    const allSelectedAreStarred =
+      selectedItemCount > 0 &&
+      selectedFiles.every((file) => starredItems.files.includes(file.id)) &&
+      selectedFolders.every((folder) => starredItems.folders.includes(folder.id));
+
+    setStarredItems((prev) => {
+      const selectedFileIds = selectedFiles.map((file) => file.id);
+      const selectedFolderIds = selectedFolders.map((folder) => folder.id);
+
+      if (allSelectedAreStarred) {
+        return {
+          files: prev.files.filter((id) => !selectedFileIds.includes(id)),
+          folders: prev.folders.filter((id) => !selectedFolderIds.includes(id)),
+        };
+      }
+
+      return {
+        files: Array.from(new Set([...prev.files, ...selectedFileIds])),
+        folders: Array.from(new Set([...prev.folders, ...selectedFolderIds])),
+      };
+    });
+    setSelectedIds([]);
+  }, [selectedFiles, selectedFolders, selectedItemCount, starredItems]);
+
+  const handleBulkRestore = useCallback(async () => {
+    try {
+      for (const file of selectedFiles) {
+        await restoreDocumentMutation.mutateAsync(file.id);
+      }
+      for (const folder of selectedFolders) {
+        await restoreFolderMutation.mutateAsync(folder.id);
+      }
+      if (selectedFolders.length > 0) {
+        setRefreshSidebar((prev) => prev + 1);
+      }
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Failed to restore selected items:", err);
+    }
+  }, [selectedFiles, selectedFolders, restoreDocumentMutation, restoreFolderMutation]);
+
   // Download handler
   const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
     try {
@@ -407,6 +471,44 @@ export default function Dashboard() {
 
   // Delete handlers
   const handleConfirmDelete = useCallback(async () => {
+    if (isBulkDeleteOpen && teamId) {
+      try {
+        for (const file of selectedFiles) {
+          if (isArchiveView) {
+            await deleteDocumentMutation.mutateAsync({
+              fileId: file.id,
+              storagePath: file.storage_path,
+            });
+          } else {
+            await archiveDocumentMutation.mutateAsync({
+              fileId: file.id,
+              teamId,
+            });
+          }
+        }
+
+        for (const folder of selectedFolders) {
+          if (isArchiveView) {
+            await deleteFolderMutation.mutateAsync(folder.id);
+          } else {
+            await archiveFolderMutation.mutateAsync({
+              folderId: folder.id,
+              teamId,
+            });
+          }
+        }
+
+        if (selectedFolders.length > 0) {
+          setRefreshSidebar((prev) => prev + 1);
+        }
+        setSelectedIds([]);
+        setIsBulkDeleteOpen(false);
+      } catch (err) {
+        console.error("Failed to delete selected items:", err);
+      }
+      return;
+    }
+
     if (fileToDelete && teamId) {
       try {
         if (isArchiveView) {
@@ -451,6 +553,9 @@ export default function Dashboard() {
     archiveDocumentMutation,
     deleteFolderMutation,
     archiveFolderMutation,
+    isBulkDeleteOpen,
+    selectedFiles,
+    selectedFolders,
   ]);
 
   // Create folder handler
@@ -624,6 +729,17 @@ export default function Dashboard() {
                   currentUserId={user?.id}
                   onPreview={(f) => setPreviewFile(f as UploadedFileRecord)}
                   onDownload={handleDownload}
+                  onOpenFolder={(folder) => {
+                    navigateToFolder(folder);
+                    setSearchQuery("");
+                    setSearchFilters({
+                      fileType: "all",
+                      dateModified: "any",
+                      owner: "anyone",
+                      tags: "",
+                      fileSize: "any",
+                    });
+                  }}
                 />
               ) : (
                 <FileTable
@@ -667,6 +783,18 @@ export default function Dashboard() {
                   }}
                   selectedIds={selectedIds}
                   onSelectedIdsChange={setSelectedIds}
+                  onBulkStar={handleBulkStar}
+                  onMergePdfs={() => setShowPdfMergeModal(true)}
+                  onBulkRestore={handleBulkRestore}
+                  onBulkDelete={() => setIsBulkDeleteOpen(true)}
+                  isBulkActionPending={
+                    deleteDocumentMutation.isPending ||
+                    archiveDocumentMutation.isPending ||
+                    deleteFolderMutation.isPending ||
+                    archiveFolderMutation.isPending ||
+                    restoreDocumentMutation.isPending ||
+                    restoreFolderMutation.isPending
+                  }
                 />
               )}
             </div>
@@ -702,13 +830,18 @@ export default function Dashboard() {
       />
 
       <DeleteConfirmModal
-        itemName={fileToDelete?.name || folderToDelete?.name || ""}
-        itemType={fileToDelete ? "file" : "folder"}
+        itemName={
+          isBulkDeleteOpen
+            ? `${selectedItemCount} selected item${selectedItemCount !== 1 ? "s" : ""}`
+            : fileToDelete?.name || folderToDelete?.name || ""
+        }
+        itemType={isBulkDeleteOpen ? "items" : fileToDelete ? "file" : "folder"}
         isPermanent={isArchiveView}
-        open={!!fileToDelete || !!folderToDelete}
+        open={isBulkDeleteOpen || !!fileToDelete || !!folderToDelete}
         onClose={() => {
           setFileToDelete(null);
           setFolderToDelete(null);
+          setIsBulkDeleteOpen(false);
         }}
         onConfirm={handleConfirmDelete}
         isDeleting={
@@ -723,6 +856,19 @@ export default function Dashboard() {
         file={previewFile}
         onClose={() => setPreviewFile(null)}
         onDownload={handleDownload}
+      />
+
+      <PdfMergeModal
+        open={showPdfMergeModal}
+        files={selectedPdfFiles}
+        teamId={teamId}
+        currentFolderId={currentFolderId}
+        canUpload={canEdit && !isSpecialView && !!teamId}
+        onClose={() => setShowPdfMergeModal(false)}
+        onUploaded={() => {
+          setShowPdfMergeModal(false);
+          setSelectedIds([]);
+        }}
       />
 
       <PersonalInfoModal

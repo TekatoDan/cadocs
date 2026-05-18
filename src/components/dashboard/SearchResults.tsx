@@ -1,9 +1,14 @@
 "use client";
 
 import React from "react";
-import { Loader2, FileText, Lock, Download, Eye } from "lucide-react";
+import { Loader2, FileText, Lock, Download, Eye, Folder, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SearchResult, TeamMember, UploadedFileRecord } from "@/lib/types";
+import type {
+  FolderRecord,
+  SearchResult,
+  TeamMember,
+  UploadedFileRecord,
+} from "@/lib/types";
 
 interface SearchResultsProps {
   results: SearchResult[];
@@ -13,6 +18,7 @@ interface SearchResultsProps {
   currentUserId: string | undefined;
   onPreview: (file: UploadedFileRecord) => void;
   onDownload: (storagePath: string, fileName: string) => void;
+  onOpenFolder: (folder: FolderRecord) => void;
 }
 
 function getOwnerName(
@@ -93,6 +99,7 @@ export function SearchResults({
   currentUserId,
   onPreview,
   onDownload,
+  onOpenFolder,
 }: SearchResultsProps) {
   if (isSearching) {
     return (
@@ -125,6 +132,53 @@ export function SearchResults({
         {results.length} result{results.length !== 1 ? "s" : ""} found
       </p>
       {results.map((result) => {
+        if (result.type === "folder") {
+          const folder = result.folder;
+          const ownerName = getOwnerName(folder.created_by, currentUserId, teamMembers);
+          const timeAgo = formatTimeAgo(folder.created_at);
+
+          return (
+            <div
+              key={result.id}
+              className={cn(
+                "rounded-lg border p-4 transition-colors",
+                "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30",
+                "dark:border-navy-700 dark:bg-navy-900 dark:hover:border-indigo-500/30 dark:hover:bg-navy-800/50"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Folder className="h-4 w-4 shrink-0 fill-indigo-100 text-indigo-500 dark:fill-indigo-900/50" />
+                    <h3 className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                      {highlightText(folder.name, searchQuery)}
+                    </h3>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span>Folder</span>
+                    <span>&middot;</span>
+                    <span>{ownerName}</span>
+                    <span>&middot;</span>
+                    <span>{timeAgo}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenFolder(folder)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "text-indigo-600 hover:bg-indigo-50",
+                    "dark:text-indigo-400 dark:hover:bg-indigo-500/10"
+                  )}
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                  Open
+                </button>
+              </div>
+            </div>
+          );
+        }
+
         const file = result.files;
         const isPrivate = file.description === "__VISIBILITY_PRIVATE__";
         const ownerName = getOwnerName(file.created_by, currentUserId, teamMembers);

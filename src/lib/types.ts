@@ -21,8 +21,9 @@ export interface UploadedFileRecord {
   created_by: string | null;
 }
 
-export interface SearchResult {
+export interface FileSearchResult {
   id: string;
+  type: "file";
   content: string;
   files: {
     id: string;
@@ -36,6 +37,15 @@ export interface SearchResult {
     description?: string | null;
   };
 }
+
+export interface FolderSearchResult {
+  id: string;
+  type: "folder";
+  content: string;
+  folder: FolderRecord;
+}
+
+export type SearchResult = FileSearchResult | FolderSearchResult;
 
 export interface SearchFilters {
   fileType?: string;
