@@ -61,22 +61,32 @@ function highlightText(
   if (!text || !query) return null;
 
   const lowerText = text.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-  const matchIndex = lowerText.indexOf(lowerQuery);
+  const terms = Array.from(
+    new Set(
+      query
+        .toLowerCase()
+        .split(/[^a-z0-9]+/i)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+    )
+  );
+  const candidates = [query.toLowerCase(), ...terms];
+  const matchedQuery = candidates.find((candidate) => lowerText.includes(candidate));
+  const matchIndex = matchedQuery ? lowerText.indexOf(matchedQuery) : -1;
 
-  if (matchIndex === -1) {
+  if (!matchedQuery || matchIndex === -1) {
     const snippet = text.slice(0, 150);
     return <span>{snippet}{text.length > 150 ? "..." : ""}</span>;
   }
 
   const snippetRadius = 75;
   const start = Math.max(0, matchIndex - snippetRadius);
-  const end = Math.min(text.length, matchIndex + query.length + snippetRadius);
+  const end = Math.min(text.length, matchIndex + matchedQuery.length + snippetRadius);
   const snippet = text.slice(start, end);
   const relativeMatchStart = matchIndex - start;
   const before = snippet.slice(0, relativeMatchStart);
-  const match = snippet.slice(relativeMatchStart, relativeMatchStart + query.length);
-  const after = snippet.slice(relativeMatchStart + query.length);
+  const match = snippet.slice(relativeMatchStart, relativeMatchStart + matchedQuery.length);
+  const after = snippet.slice(relativeMatchStart + matchedQuery.length);
 
   return (
     <span>

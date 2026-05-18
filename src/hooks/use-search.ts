@@ -19,7 +19,7 @@ export function useSearchDocuments(
   const hasFilters = Object.values(filters).some(
     (v) => v !== "all" && v !== "any" && v !== "anyone" && v !== ""
   );
-  const isActive = (debouncedQuery.length >= 3 || hasFilters) && !!teamId;
+  const isActive = (debouncedQuery.trim().length >= 2 || hasFilters) && !!teamId;
 
   return useQuery({
     queryKey: ["search", teamId, debouncedQuery, filters],

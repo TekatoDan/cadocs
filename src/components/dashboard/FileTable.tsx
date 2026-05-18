@@ -13,6 +13,7 @@ import {
   X,
   Loader2,
   FileText,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FolderRow } from "@/components/dashboard/FolderRow";
@@ -60,6 +61,7 @@ interface FileTableProps {
   selectedIds: string[];
   onSelectedIdsChange: (ids: string[]) => void;
   onBulkStar: () => void;
+  onBulkReindex: () => void;
   onMergePdfs: () => void;
   onBulkRestore: () => void;
   onBulkDelete: () => void;
@@ -135,6 +137,7 @@ export function FileTable({
   selectedIds,
   onSelectedIdsChange,
   onBulkStar,
+  onBulkReindex,
   onMergePdfs,
   onBulkRestore,
   onBulkDelete,
@@ -209,6 +212,27 @@ export function FileTable({
               <Star className="h-3.5 w-3.5" fill={selectedAreAllStarred ? "currentColor" : "none"} />
               {selectedAreAllStarred ? "Unstar" : "Star"}
             </button>
+            {canEdit && !isArchiveView && selectedFileCount > 0 && (
+              <button
+                type="button"
+                onClick={onBulkReindex}
+                disabled={isBulkActionPending}
+                className={cn(
+                  "app-focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "border border-slate-200 bg-white text-slate-700 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700",
+                  "dark:border-navy-600 dark:bg-navy-900 dark:text-slate-300 dark:hover:bg-cyan-900/20 dark:hover:text-cyan-300",
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+                title="Rebuild search index for selected files"
+              >
+                {isBulkActionPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Search className="h-3.5 w-3.5" />
+                )}
+                Index
+              </button>
+            )}
             {selectedPdfCount >= 2 && (
               <button
                 type="button"

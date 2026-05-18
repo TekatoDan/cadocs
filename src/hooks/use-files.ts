@@ -13,6 +13,7 @@ import {
   updateDocumentName,
   moveDocument,
   getSignedDownloadUrl,
+  reindexDocument,
 } from "@/app/actions/storage";
 import { extractSearchTextWithOcr } from "@/app/actions/indexing";
 
@@ -167,6 +168,16 @@ export function useMoveDocument() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["folders"] });
+    },
+  });
+}
+
+export function useReindexDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileId: string) => reindexDocument(fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["search"] });
     },
   });
 }

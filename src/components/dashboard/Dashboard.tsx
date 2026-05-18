@@ -29,10 +29,21 @@ import { PersonalInfoModal } from "./PersonalInfoModal";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { BrandLoader } from "@/components/ui/BrandLoader";
 import { useCreateFolder, useDeleteFolder, useArchiveFolderMutation } from "@/hooks/use-folders";
-import { useDeleteDocument, useArchiveDocument, useRestoreDocument } from "@/hooks/use-files";
+import {
+  useDeleteDocument,
+  useArchiveDocument,
+  useRestoreDocument,
+  useReindexDocument,
+} from "@/hooks/use-files";
 import { useRestoreFolder } from "@/hooks/use-folders";
 
 type ViewMode = "files" | "recent" | "starred" | "archive";
+type BulkIndexResult = {
+  file: UploadedFileRecord;
+  result:
+    | { ok: true; indexed: boolean; message: string }
+    | { ok: false; error: string };
+};
 
 export default function Dashboard() {
   const { session, user, signOut } = useAuth();
@@ -143,7 +154,7 @@ export default function Dashboard() {
   );
 
   const isSearchActive =
-    searchQuery.length >= 3 ||
+    searchQuery.trim().length >= 2 ||
     Object.values(searchFilters).some(
       (v) => v !== "all" && v !== "any" && v !== "anyone" && v !== ""
     );
@@ -156,6 +167,7 @@ export default function Dashboard() {
   const deleteDocumentMutation = useDeleteDocument();
   const archiveDocumentMutation = useArchiveDocument();
   const restoreDocumentMutation = useRestoreDocument();
+  const reindexDocumentMutation = useReindexDocument();
   const moveDocumentMutation = useMoveDocument();
   const moveFolderMutation = useMoveFolder();
   const getArchiveFolderMutation = useGetArchiveFolder();
@@ -434,6 +446,46 @@ export default function Dashboard() {
       console.error("Failed to restore selected items:", err);
     }
   }, [selectedFiles, selectedFolders, restoreDocumentMutation, restoreFolderMutation]);
+
+  const handleBulkReindex = useCallback(async () => {
+    if (selectedFiles.length === 0) return;
+
+    try {
+      const results: BulkIndexResult[] = [];
+      for (const file of selectedFiles) {
+        const result = await reindexDocumentMutation.mutateAsync(file.id);
+        results.push({ file, result });
+      }
+
+      const indexedCount = results.filter((item) => item.result.ok && item.result.indexed).length;
+      const skipped = results.filter((item) => !item.result.ok || !item.result.indexed);
+
+      if (skipped.length > 0) {
+        const details = skipped
+          .slice(0, 5)
+          .map(({ file, result }) => {
+            const message = result.ok ? result.message : result.error;
+            return `${file.name}: ${message}`;
+          })
+          .join("\n");
+        const extra = skipped.length > 5 ? `\n${skipped.length - 5} more skipped.` : "";
+        window.alert(
+          `Search index updated for ${indexedCount} of ${results.length} file${results.length !== 1 ? "s" : ""}.\n\n${details}${extra}`
+        );
+      } else {
+        window.alert(
+          `Search index updated for ${indexedCount} file${indexedCount !== 1 ? "s" : ""}.`
+        );
+      }
+
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Failed to update the search index:", err);
+      window.alert(
+        err instanceof Error ? err.message : "Unable to update the search index."
+      );
+    }
+  }, [selectedFiles, reindexDocumentMutation]);
 
   // Download handler
   const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
@@ -784,6 +836,7 @@ export default function Dashboard() {
                   selectedIds={selectedIds}
                   onSelectedIdsChange={setSelectedIds}
                   onBulkStar={handleBulkStar}
+                  onBulkReindex={handleBulkReindex}
                   onMergePdfs={() => setShowPdfMergeModal(true)}
                   onBulkRestore={handleBulkRestore}
                   onBulkDelete={() => setIsBulkDeleteOpen(true)}
@@ -793,7 +846,8 @@ export default function Dashboard() {
                     deleteFolderMutation.isPending ||
                     archiveFolderMutation.isPending ||
                     restoreDocumentMutation.isPending ||
-                    restoreFolderMutation.isPending
+                    restoreFolderMutation.isPending ||
+                    reindexDocumentMutation.isPending
                   }
                 />
               )}

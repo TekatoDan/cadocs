@@ -4,6 +4,57 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
 import type { SearchFilters, SearchResult } from "@/lib/types";
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getSearchTerms(query: string) {
+  return Array.from(
+    new Set(
+      normalizeSearchText(query)
+        .split(" ")
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+    )
+  );
+}
+
+function containsInsensitive(field: string, value: string) {
+  return { [field]: { contains: value, mode: "insensitive" as const } };
+}
+
+function buildAnyTextSearchFilter(field: string, query: string, terms: string[]) {
+  const conditions: any[] = [containsInsensitive(field, query)];
+  for (const term of terms) {
+    if (term.toLowerCase() !== query.toLowerCase()) {
+      conditions.push(containsInsensitive(field, term));
+    }
+  }
+  return conditions.length === 1 ? conditions[0] : { OR: conditions };
+}
+
+function buildNameSearchFilter(field: string, query: string, terms: string[]) {
+  const conditions: any[] = [containsInsensitive(field, query)];
+  if (terms.length > 0) {
+    conditions.push({
+      AND: terms.map((term) => containsInsensitive(field, term)),
+    });
+  }
+  return conditions.length === 1 ? conditions[0] : { OR: conditions };
+}
+
+function matchesSearchTerms(content: string, normalizedQuery: string, terms: string[]) {
+  const normalizedContent = normalizeSearchText(content);
+  if (!normalizedQuery && terms.length === 0) return true;
+  if (normalizedQuery && normalizedContent.includes(normalizedQuery)) return true;
+  return terms.length > 0 && terms.every((term) => normalizedContent.includes(term));
+}
+
 export async function searchDocuments(
   teamId: string,
   query: string,
@@ -19,6 +70,9 @@ export async function searchDocuments(
     );
 
   if (!hasQuery && !hasFilters) return [];
+
+  const searchTerms = getSearchTerms(trimmedQuery);
+  const normalizedQuery = normalizeSearchText(trimmedQuery);
 
   // Build visibility filter
   const visibilityFilter = [
@@ -97,7 +151,7 @@ export async function searchDocuments(
     // Search document contents
     const contentMatches = await prisma.documentContent.findMany({
       where: {
-        content: { contains: trimmedQuery, mode: "insensitive" },
+        AND: [buildAnyTextSearchFilter("content", trimmedQuery, searchTerms)],
         file: {
           teamId,
           status: { not: "archived" },
@@ -120,16 +174,40 @@ export async function searchDocuments(
           },
         },
       },
-      take: 20,
+      orderBy: [{ fileId: "asc" }, { chunkIndex: "asc" }],
+      take: 200,
     });
 
+    const contentMatchesByFile = new Map<
+      string,
+      { id: string; chunks: string[]; file: (typeof contentMatches)[number]["file"] }
+    >();
+
     for (const match of contentMatches) {
+      const group = contentMatchesByFile.get(match.file.id);
+      if (group) {
+        group.chunks.push(match.content);
+      } else {
+        contentMatchesByFile.set(match.file.id, {
+          id: match.id,
+          chunks: [match.content],
+          file: match.file,
+        });
+      }
+    }
+
+    for (const match of contentMatchesByFile.values()) {
       if (seenFileIds.has(match.file.id)) continue;
+      const combinedContent = match.chunks.join("\n\n");
+      if (!matchesSearchTerms(combinedContent, normalizedQuery, searchTerms)) {
+        continue;
+      }
+
       seenFileIds.add(match.file.id);
       results.push({
         id: match.id,
         type: "file",
-        content: match.content,
+        content: combinedContent,
         files: {
           id: match.file.id,
           name: match.file.name,
@@ -142,6 +220,7 @@ export async function searchDocuments(
           description: match.file.description,
         },
       });
+      if (results.length >= 20) break;
     }
 
     // Search folder names
@@ -153,7 +232,7 @@ export async function searchDocuments(
     const folderMatches = await prisma.folder.findMany({
       where: {
         teamId,
-        name: { contains: trimmedQuery, mode: "insensitive" },
+        AND: [buildNameSearchFilter("name", trimmedQuery, searchTerms)],
         NOT: [
           { name: ".archive" },
           ...(archiveFolder ? [{ parentId: archiveFolder.id }] : []),
@@ -185,7 +264,7 @@ export async function searchDocuments(
       where: {
         teamId,
         status: { not: "archived" },
-        name: { contains: trimmedQuery, mode: "insensitive" },
+        AND: [buildNameSearchFilter("name", trimmedQuery, searchTerms)],
         OR: visibilityFilter,
         ...extraFilters,
       },

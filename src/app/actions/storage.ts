@@ -3,6 +3,10 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
 import { STORAGE_BUCKET } from "@/lib/storage-bucket";
+import {
+  extractSearchTextFromFileWithOcr,
+  extractSearchTextFromPdfFile,
+} from "@/app/actions/indexing";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
 const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
@@ -10,6 +14,10 @@ const MIN_FILE_NAME_LENGTH = 16;
 
 type UploadDocumentResult =
   | { ok: true; file: UploadedFileRecord }
+  | { ok: false; error: string };
+
+type ReindexDocumentResult =
+  | { ok: true; indexed: boolean; message: string }
   | { ok: false; error: string };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -61,6 +69,24 @@ function inferMimeType(fileName: string) {
   if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) return "text/plain";
   if (lowerName.endsWith(".csv")) return "text/csv";
   return "application/octet-stream";
+}
+
+function isTextSearchableFile(fileName: string, mimeType: string) {
+  return (
+    mimeType.startsWith("text/") ||
+    /\.(txt|md|csv|json|log)$/i.test(fileName)
+  );
+}
+
+function isPdfFile(fileName: string, mimeType: string) {
+  return mimeType === "application/pdf" || /\.pdf$/i.test(fileName);
+}
+
+function isImageFile(fileName: string, mimeType: string) {
+  return (
+    mimeType.startsWith("image/") ||
+    /\.(png|jpe?g|webp)$/i.test(fileName)
+  );
 }
 
 async function getAvailableFileName(
@@ -327,6 +353,13 @@ export async function saveDocumentContent(
   content: string
 ): Promise<void> {
   await getAuthUser();
+  await saveDocumentContentForFile(fileId, content);
+}
+
+async function saveDocumentContentForFile(
+  fileId: string,
+  content: string
+): Promise<void> {
   const normalizedContent = content
     .replace(/\u0000/g, "")
     .replace(/[ \t]+/g, " ")
@@ -347,6 +380,92 @@ export async function saveDocumentContent(
       })),
     });
   });
+}
+
+export async function reindexDocument(
+  fileId: string
+): Promise<ReindexDocumentResult> {
+  try {
+    const user = await getAuthUser();
+    const file = await prisma.file.findFirst({
+      where: {
+        id: fileId,
+        OR: [
+          { description: null },
+          { description: { not: "__VISIBILITY_PRIVATE__" } },
+          { description: "__VISIBILITY_PRIVATE__", createdBy: user.id },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        mimeType: true,
+        storagePath: true,
+      },
+    });
+
+    if (!file) {
+      return { ok: false, error: "File not found or not accessible." };
+    }
+
+    const mimeType = file.mimeType || inferMimeType(file.name);
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(file.storagePath);
+
+    if (error || !data) {
+      return {
+        ok: false,
+        error: error?.message || "Unable to read this file from storage.",
+      };
+    }
+
+    const storedFile = new File([data], file.name, { type: mimeType });
+    let searchableText: string | null = null;
+
+    if (isTextSearchableFile(file.name, mimeType)) {
+      searchableText = await data.text();
+    } else if (isPdfFile(file.name, mimeType)) {
+      searchableText = await extractSearchTextFromPdfFile(storedFile);
+      if (!searchableText) {
+        searchableText = await extractSearchTextFromFileWithOcr(storedFile);
+      }
+    } else if (isImageFile(file.name, mimeType)) {
+      searchableText = await extractSearchTextFromFileWithOcr(storedFile);
+    } else {
+      return {
+        ok: true,
+        indexed: false,
+        message: "This file type does not support search indexing yet.",
+      };
+    }
+
+    if (!searchableText?.trim()) {
+      const needsOcr = isPdfFile(file.name, mimeType) || isImageFile(file.name, mimeType);
+      return {
+        ok: true,
+        indexed: false,
+        message:
+          needsOcr && !process.env.GEMINI_API_KEY
+            ? "No embedded text was found. Add GEMINI_API_KEY to index scanned PDFs and images."
+            : "No searchable text was found in this file.",
+      };
+    }
+
+    await saveDocumentContentForFile(file.id, searchableText);
+
+    return {
+      ok: true,
+      indexed: true,
+      message: "Search index updated.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: getErrorMessage(error, "Unable to update the search index."),
+    };
+  }
 }
 
 function chunkDocumentContent(content: string, chunkSize = 4000): string[] {

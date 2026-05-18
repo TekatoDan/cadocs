@@ -15,16 +15,130 @@ function getMimeType(file: File) {
   return "application/octet-stream";
 }
 
-export async function extractSearchTextWithOcr(
-  formData: FormData
-): Promise<string | null> {
-  await getAuthUser();
+function normalizeExtractedText(text: string) {
+  return text
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
+function ensurePdfJsNodeStubs() {
+  const globalScope = globalThis as typeof globalThis & {
+    DOMMatrix?: typeof DOMMatrix;
+    ImageData?: typeof ImageData;
+    Path2D?: typeof Path2D;
+  };
+
+  if (typeof globalScope.DOMMatrix === "undefined") {
+    globalScope.DOMMatrix = class DOMMatrixStub {
+      a = 1;
+      b = 0;
+      c = 0;
+      d = 1;
+      e = 0;
+      f = 0;
+
+      constructor(init?: number[]) {
+        if (Array.isArray(init)) {
+          [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+        }
+      }
+
+      multiplySelf() {
+        return this;
+      }
+
+      preMultiplySelf() {
+        return this;
+      }
+
+      translateSelf() {
+        return this;
+      }
+
+      scaleSelf() {
+        return this;
+      }
+
+      rotateSelf() {
+        return this;
+      }
+
+      invertSelf() {
+        return this;
+      }
+
+      transformPoint(point: DOMPointInit) {
+        return point;
+      }
+    } as unknown as typeof DOMMatrix;
+  }
+
+  if (typeof globalScope.ImageData === "undefined") {
+    globalScope.ImageData = class ImageDataStub {
+      data: Uint8ClampedArray;
+      width: number;
+      height: number;
+
+      constructor(data: Uint8ClampedArray, width: number, height?: number) {
+        this.data = data;
+        this.width = width;
+        this.height = height ?? 0;
+      }
+    } as unknown as typeof ImageData;
+  }
+
+  if (typeof globalScope.Path2D === "undefined") {
+    globalScope.Path2D = class Path2DStub {} as unknown as typeof Path2D;
+  }
+}
+
+export async function extractSearchTextFromPdfFile(
+  file: File
+): Promise<string | null> {
+  const mimeType = getMimeType(file);
+  if (mimeType !== "application/pdf") return null;
+
+  try {
+    ensurePdfJsNodeStubs();
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const data = new Uint8Array(await file.arrayBuffer());
+    const pdf = await (pdfjs.getDocument as any)({
+      data,
+      disableWorker: true,
+      useSystemFonts: true,
+    }).promise;
+    const pageTexts: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: unknown) =>
+          item && typeof item === "object" && "str" in item
+            ? String(item.str ?? "")
+            : ""
+        )
+        .filter(Boolean)
+        .join(" ");
+      if (pageText.trim()) pageTexts.push(pageText);
+    }
+
+    return normalizeExtractedText(pageTexts.join("\n\n")) || null;
+  } catch (error) {
+    console.warn("PDF text indexing failed:", error);
+    return null;
+  }
+}
+
+export async function extractSearchTextFromFileWithOcr(
+  file: File
+): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const file = formData.get("file") as File | null;
-  if (!file || file.size === 0 || file.size > OCR_MAX_FILE_SIZE_BYTES) {
+  if (file.size === 0 || file.size > OCR_MAX_FILE_SIZE_BYTES) {
     return null;
   }
 
@@ -49,9 +163,19 @@ export async function extractSearchTextWithOcr(
       ],
     });
 
-    return response.text?.trim() || null;
+    return normalizeExtractedText(response.text ?? "") || null;
   } catch (error) {
     console.warn("OCR indexing failed:", error);
     return null;
   }
+}
+
+export async function extractSearchTextWithOcr(
+  formData: FormData
+): Promise<string | null> {
+  await getAuthUser();
+
+  const file = formData.get("file") as File | null;
+  if (!file) return null;
+  return extractSearchTextFromFileWithOcr(file);
 }
