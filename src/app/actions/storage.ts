@@ -51,6 +51,18 @@ function shortenFileName(fileName: string, maxLength: number, suffix = "") {
   return `${shortenedBase}${suffix}${extension}`;
 }
 
+function inferMimeType(fileName: string) {
+  const lowerName = fileName.toLowerCase();
+  if (lowerName.endsWith(".pdf")) return "application/pdf";
+  if (lowerName.endsWith(".png")) return "image/png";
+  if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) return "image/jpeg";
+  if (lowerName.endsWith(".webp")) return "image/webp";
+  if (lowerName.endsWith(".gif")) return "image/gif";
+  if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) return "text/plain";
+  if (lowerName.endsWith(".csv")) return "text/csv";
+  return "application/octet-stream";
+}
+
 async function getAvailableFileName(
   teamId: string,
   folderId: string | null,
@@ -248,6 +260,7 @@ export async function uploadDocument(
       file.name,
       maxFileNameLength
     );
+    const mimeType = file.type || inferMimeType(file.name);
 
     const fileExt = file.name.split(".").pop();
     const uniqueId = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
@@ -259,7 +272,7 @@ export async function uploadDocument(
       .upload(storagePath, arrayBuffer, {
         cacheControl: "3600",
         upsert: false,
-        contentType: file.type || "application/octet-stream",
+        contentType: mimeType,
       });
 
     if (uploadError) {
@@ -285,7 +298,7 @@ export async function uploadDocument(
         description: isPrivate ? "__VISIBILITY_PRIVATE__" : null,
         storagePath,
         sizeBytes: BigInt(file.size),
-        mimeType: file.type,
+        mimeType,
         status: "draft",
         createdBy: user.id,
       },
@@ -314,9 +327,50 @@ export async function saveDocumentContent(
   content: string
 ): Promise<void> {
   await getAuthUser();
-  await prisma.documentContent.create({
-    data: { fileId, chunkIndex: 0, content },
+  const normalizedContent = content
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!normalizedContent) return;
+
+  const chunks = chunkDocumentContent(normalizedContent);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.documentContent.deleteMany({ where: { fileId } });
+    await tx.documentContent.createMany({
+      data: chunks.map((chunk, index) => ({
+        fileId,
+        chunkIndex: index,
+        content: chunk,
+      })),
+    });
   });
+}
+
+function chunkDocumentContent(content: string, chunkSize = 4000): string[] {
+  const chunks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < content.length) {
+    let end = Math.min(cursor + chunkSize, content.length);
+    if (end < content.length) {
+      const paragraphBreak = content.lastIndexOf("\n\n", end);
+      const sentenceBreak = content.lastIndexOf(". ", end);
+      const spaceBreak = content.lastIndexOf(" ", end);
+      const breakAt = Math.max(paragraphBreak, sentenceBreak, spaceBreak);
+      if (breakAt > cursor + chunkSize * 0.6) {
+        end = breakAt + (breakAt === sentenceBreak ? 1 : 0);
+      }
+    }
+
+    const chunk = content.slice(cursor, end).trim();
+    if (chunk) chunks.push(chunk);
+    cursor = end;
+  }
+
+  return chunks.length > 0 ? chunks : [content];
 }
 
 export async function getTeamFiles(

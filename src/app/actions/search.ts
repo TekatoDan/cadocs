@@ -124,6 +124,7 @@ export async function searchDocuments(
     });
 
     for (const match of contentMatches) {
+      if (seenFileIds.has(match.file.id)) continue;
       seenFileIds.add(match.file.id);
       results.push({
         id: match.id,

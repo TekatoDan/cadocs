@@ -14,6 +14,15 @@ import {
   moveDocument,
   getSignedDownloadUrl,
 } from "@/app/actions/storage";
+import { extractSearchTextWithOcr } from "@/app/actions/indexing";
+
+function isOcrCandidate(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.type.startsWith("image/") ||
+    /\.(pdf|png|jpe?g|webp)$/i.test(file.name)
+  );
+}
 
 export function useFiles(teamId: string | null, folderId: string | null) {
   return useQuery({
@@ -55,6 +64,18 @@ export function useUploadDocument() {
       isPrivate: boolean;
       extractedText?: string;
     }) => {
+      let searchableText = extractedText?.trim();
+
+      if (!searchableText && isOcrCandidate(file)) {
+        try {
+          const ocrFormData = new FormData();
+          ocrFormData.append("file", file);
+          searchableText = (await extractSearchTextWithOcr(ocrFormData)) ?? undefined;
+        } catch (error) {
+          console.warn("OCR indexing failed:", error);
+        }
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("teamId", teamId);
@@ -69,9 +90,9 @@ export function useUploadDocument() {
 
       const record = result.file;
 
-      if (extractedText) {
+      if (searchableText) {
         try {
-          await saveDocumentContent(record.id, extractedText);
+          await saveDocumentContent(record.id, searchableText);
         } catch (error) {
           console.warn("File uploaded, but search indexing failed:", error);
         }

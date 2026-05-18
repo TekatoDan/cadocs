@@ -11,26 +11,43 @@ export async function extractTextFromPDF(file: File): Promise<string> {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
+    const pages: string[] = [];
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items
         .map((item: any) => item.str)
+        .filter(Boolean)
         .join(" ");
-      fullText += pageText + "\n\n";
+      pages.push(pageText);
     }
 
-    return fullText.trim();
+    return normalizeExtractedText(pages.join("\n\n"));
   } catch (error) {
     console.error("Error parsing PDF:", error);
     throw new Error("Failed to parse PDF document.");
   }
 }
 
+export function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
+
+export function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+}
+
+export function normalizeExtractedText(text: string): string {
+  return text
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export async function extractTextFromFile(file: File): Promise<string> {
-  if (file.type === "application/pdf") {
+  if (isPdfFile(file)) {
     return extractTextFromPDF(file);
   }
 
