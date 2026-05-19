@@ -21,6 +21,7 @@ type UploadQueueStatus =
   | "scanning_content"
   | "ocr_processing"
   | "indexed"
+  | "ocr_not_configured"
   | "failed_to_extract_text"
   | "error";
 
@@ -97,7 +98,9 @@ export function UploadPanel({
                           ...item,
                           status,
                           message:
-                            status === "failed_to_extract_text"
+                            status === "failed_to_extract_text" ||
+                            status === "ocr_not_configured" ||
+                            status === "uploaded"
                               ? message || "Text extraction failed."
                               : item.message,
                         }
@@ -174,6 +177,7 @@ export function UploadPanel({
     if (status === "scanning_content") return "Scanning content";
     if (status === "ocr_processing") return "OCR processing";
     if (status === "indexed") return "Indexed";
+    if (status === "ocr_not_configured") return "Uploaded";
     if (status === "failed_to_extract_text") return "Failed to extract text";
     return "Failed";
   };
@@ -274,6 +278,8 @@ export function UploadPanel({
                       className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${
                         item.status === "indexed"
                           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : item.status === "ocr_not_configured"
+                          ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
                           : item.status === "error" ||
                               item.status === "failed_to_extract_text"
                           ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
@@ -284,9 +290,17 @@ export function UploadPanel({
                     </span>
                   </div>
                   {(item.status === "error" ||
-                    item.status === "failed_to_extract_text") &&
+                    item.status === "failed_to_extract_text" ||
+                    item.status === "ocr_not_configured") &&
                     item.message && (
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-red-600 dark:text-red-300">
+                    <p
+                      className={cn(
+                        "mt-1 line-clamp-2 text-[11px] leading-snug",
+                        item.status === "ocr_not_configured"
+                          ? "text-cyan-700 dark:text-cyan-300"
+                          : "text-red-600 dark:text-red-300"
+                      )}
+                    >
                       {item.message}
                     </p>
                   )}

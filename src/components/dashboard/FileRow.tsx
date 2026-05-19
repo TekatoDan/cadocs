@@ -124,6 +124,14 @@ function getIndexingStatusMeta(file: UploadedFileRecord) {
     };
   }
 
+  if (status === "ocr_not_configured") {
+    return {
+      label: "OCR not configured",
+      className:
+        "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-900/20 dark:text-cyan-300 dark:ring-cyan-800/50",
+    };
+  }
+
   if (status === "failed_to_extract_text") {
     return {
       label: "Text extraction failed",
@@ -169,7 +177,9 @@ export function FileRow({
   const isPrivate = file.description === "__VISIBILITY_PRIVATE__";
   const indexingStatus = getIndexingStatusMeta(file);
   const canRetryIndexing =
-    canEdit && file.indexing_status === "failed_to_extract_text";
+    canEdit &&
+    (file.indexing_status === "failed_to_extract_text" ||
+      file.indexing_status === "ocr_not_configured");
 
   useEffect(() => {
     if (isRenaming) {

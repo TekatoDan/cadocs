@@ -6,6 +6,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   extractReadableTextFromFile,
   flattenExtractedSections,
+  isOcrNotConfiguredError,
 } from "./document-text-extraction";
 import {
   getSearchTerms,
@@ -138,7 +139,7 @@ test("reports a clear configuration error when OCR is needed without a Gemini ke
     const result = await extractReadableTextFromFile(file);
 
     assert.equal(result.sections.length, 0);
-    assert.match(result.error ?? "", /OCR is not configured/);
+    assert.match(result.error ?? "", /searchable by filename only/);
   } finally {
     if (originalApiKey === undefined) {
       delete process.env.GEMINI_API_KEY;
@@ -146,6 +147,15 @@ test("reports a clear configuration error when OCR is needed without a Gemini ke
       process.env.GEMINI_API_KEY = originalApiKey;
     }
   }
+});
+
+test("treats Gemini project denial as OCR unavailable", () => {
+  assert.equal(
+    isOcrNotConfiguredError(
+      '{"error":{"code":403,"message":"Your project has been denied access. Please contact support.","status":"PERMISSION_DENIED"}}'
+    ),
+    true
+  );
 });
 
 test("marks files with no readable text as extraction failures", async () => {
