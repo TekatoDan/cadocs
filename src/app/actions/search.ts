@@ -2,13 +2,27 @@
 
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/auth";
-import {
-  getSearchTerms,
-  matchesSearchTerms,
-  normalizeSearchText,
-  selectBestContentMatch,
-} from "@/lib/search-match";
 import type { SearchFilters, SearchResult } from "@/lib/types";
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getSearchTerms(query: string) {
+  return Array.from(
+    new Set(
+      normalizeSearchText(query)
+        .split(" ")
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+    )
+  );
+}
 
 function containsInsensitive(field: string, value: string) {
   return { [field]: { contains: value, mode: "insensitive" as const } };
@@ -32,6 +46,13 @@ function buildNameSearchFilter(field: string, query: string, terms: string[]) {
     });
   }
   return conditions.length === 1 ? conditions[0] : { OR: conditions };
+}
+
+function matchesSearchTerms(content: string, normalizedQuery: string, terms: string[]) {
+  const normalizedContent = normalizeSearchText(content);
+  if (!normalizedQuery && terms.length === 0) return true;
+  if (normalizedQuery && normalizedContent.includes(normalizedQuery)) return true;
+  return terms.length > 0 && terms.every((term) => normalizedContent.includes(term));
 }
 
 export async function searchDocuments(
@@ -71,7 +92,6 @@ export async function searchDocuments(
         in: [
           "application/msword",
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           "text/plain",
         ],
       };
@@ -148,9 +168,6 @@ export async function searchDocuments(
             storagePath: true,
             mimeType: true,
             sizeBytes: true,
-            indexingStatus: true,
-            indexingError: true,
-            indexedAt: true,
             createdAt: true,
             createdBy: true,
             description: true,
@@ -163,36 +180,17 @@ export async function searchDocuments(
 
     const contentMatchesByFile = new Map<
       string,
-      {
-        chunks: {
-          id: string;
-          content: string;
-          pageNumber: number | null;
-          section: string | null;
-        }[];
-        file: (typeof contentMatches)[number]["file"];
-      }
+      { id: string; chunks: string[]; file: (typeof contentMatches)[number]["file"] }
     >();
 
     for (const match of contentMatches) {
       const group = contentMatchesByFile.get(match.file.id);
       if (group) {
-        group.chunks.push({
-          id: match.id,
-          content: match.content,
-          pageNumber: match.pageNumber,
-          section: match.section,
-        });
+        group.chunks.push(match.content);
       } else {
         contentMatchesByFile.set(match.file.id, {
-          chunks: [
-            {
-              id: match.id,
-              content: match.content,
-              pageNumber: match.pageNumber,
-              section: match.section,
-            },
-          ],
+          id: match.id,
+          chunks: [match.content],
           file: match.file,
         });
       }
@@ -200,22 +198,16 @@ export async function searchDocuments(
 
     for (const match of contentMatchesByFile.values()) {
       if (seenFileIds.has(match.file.id)) continue;
-      const combinedContent = match.chunks.map((chunk) => chunk.content).join("\n\n");
+      const combinedContent = match.chunks.join("\n\n");
       if (!matchesSearchTerms(combinedContent, normalizedQuery, searchTerms)) {
         continue;
       }
 
-      const bestChunk =
-        selectBestContentMatch(match.chunks, normalizedQuery, searchTerms) ??
-        match.chunks[0];
-
       seenFileIds.add(match.file.id);
       results.push({
-        id: bestChunk.id,
+        id: match.id,
         type: "file",
-        content: bestChunk.content,
-        page_number: bestChunk.pageNumber,
-        section: bestChunk.section,
+        content: combinedContent,
         files: {
           id: match.file.id,
           name: match.file.name,
@@ -223,9 +215,6 @@ export async function searchDocuments(
           storage_path: match.file.storagePath,
           mime_type: match.file.mimeType,
           size_bytes: Number(match.file.sizeBytes),
-          indexing_status: match.file.indexingStatus,
-          indexing_error: match.file.indexingError,
-          indexed_at: match.file.indexedAt?.toISOString() ?? null,
           created_at: match.file.createdAt.toISOString(),
           created_by: match.file.createdBy,
           description: match.file.description,
@@ -296,9 +285,6 @@ export async function searchDocuments(
             storage_path: file.storagePath,
             mime_type: file.mimeType,
             size_bytes: Number(file.sizeBytes),
-            indexing_status: file.indexingStatus,
-            indexing_error: file.indexingError,
-            indexed_at: file.indexedAt?.toISOString() ?? null,
             created_at: file.createdAt.toISOString(),
             created_by: file.createdBy,
             description: file.description,
@@ -331,9 +317,6 @@ export async function searchDocuments(
           storage_path: file.storagePath,
           mime_type: file.mimeType,
           size_bytes: Number(file.sizeBytes),
-          indexing_status: file.indexingStatus,
-          indexing_error: file.indexingError,
-          indexed_at: file.indexedAt?.toISOString() ?? null,
           created_at: file.createdAt.toISOString(),
           created_by: file.createdBy,
           description: file.description,

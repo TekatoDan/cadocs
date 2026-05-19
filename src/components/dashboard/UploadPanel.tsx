@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback } from "react";
 import { UploadCloud, X, Shield, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUploadDocument } from "@/hooks/use-files";
+import { extractTextFromFile } from "@/lib/parser";
 
 interface UploadPanelProps {
   teamId: string;
@@ -12,17 +13,8 @@ interface UploadPanelProps {
   variant?: "panel" | "drawer";
 }
 
-const ACCEPTED_FILE_TYPES = ".pdf,.docx,.doc,.txt,.md,.csv,.xlsx,.pptx,.png,.jpg,.jpeg";
+const ACCEPTED_FILE_TYPES = ".pdf,.txt,.md,.csv,.png,.jpg,.jpeg";
 const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
-type UploadQueueStatus =
-  | "queued"
-  | "uploaded"
-  | "uploading"
-  | "scanning_content"
-  | "ocr_processing"
-  | "indexed"
-  | "failed_to_extract_text"
-  | "error";
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
@@ -42,7 +34,7 @@ export function UploadPanel({
     {
       id: string;
       name: string;
-      status: UploadQueueStatus;
+      status: "queued" | "extracting" | "uploading" | "done" | "error";
       message?: string;
     }[]
   >([]);
@@ -79,6 +71,19 @@ export function UploadPanel({
       try {
         for (const { file, id: queueId } of uploadableItems) {
           try {
+            let extractedText: string | undefined;
+
+            setQueue((prev) =>
+              prev.map((item) =>
+                item.id === queueId ? { ...item, status: "extracting" } : item
+              )
+            );
+            try {
+              extractedText = await extractTextFromFile(file);
+            } catch {
+              extractedText = undefined;
+            }
+
             setQueue((prev) =>
               prev.map((item) =>
                 item.id === queueId ? { ...item, status: "uploading" } : item
@@ -89,28 +94,11 @@ export function UploadPanel({
               teamId,
               folderId: currentFolderId,
               isPrivate: isPrivateUpload,
-              onIndexingStatus: (status, message) => {
-                setQueue((prev) =>
-                  prev.map((item) =>
-                    item.id === queueId
-                      ? {
-                          ...item,
-                          status,
-                          message:
-                            status === "failed_to_extract_text"
-                              ? message || "Text extraction failed."
-                              : item.message,
-                        }
-                      : item
-                  )
-                );
-              },
+              extractedText,
             });
             setQueue((prev) =>
               prev.map((item) =>
-                item.id === queueId && item.status !== "failed_to_extract_text"
-                  ? { ...item, status: "indexed" }
-                  : item
+                item.id === queueId ? { ...item, status: "done" } : item
               )
             );
           } catch (error) {
@@ -169,12 +157,9 @@ export function UploadPanel({
 
   const getStatusLabel = (status: (typeof queue)[number]["status"]) => {
     if (status === "queued") return "Queued";
-    if (status === "uploaded") return "Uploaded";
+    if (status === "extracting") return "Extracting";
     if (status === "uploading") return "Uploading";
-    if (status === "scanning_content") return "Scanning content";
-    if (status === "ocr_processing") return "OCR processing";
-    if (status === "indexed") return "Indexed";
-    if (status === "failed_to_extract_text") return "Failed to extract text";
+    if (status === "done") return "Uploaded";
     return "Failed";
   };
 
@@ -272,10 +257,9 @@ export function UploadPanel({
                     <span className="truncate text-slate-700 dark:text-slate-200">{item.name}</span>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${
-                        item.status === "indexed"
+                        item.status === "done"
                           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                          : item.status === "error" ||
-                              item.status === "failed_to_extract_text"
+                          : item.status === "error"
                           ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                           : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                       }`}
@@ -283,9 +267,7 @@ export function UploadPanel({
                       {getStatusLabel(item.status)}
                     </span>
                   </div>
-                  {(item.status === "error" ||
-                    item.status === "failed_to_extract_text") &&
-                    item.message && (
+                  {item.status === "error" && item.message && (
                     <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-red-600 dark:text-red-300">
                       {item.message}
                     </p>

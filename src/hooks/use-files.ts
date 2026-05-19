@@ -6,6 +6,7 @@ import {
   getRecentFiles,
   getStarredFiles,
   uploadDocument,
+  saveDocumentContent,
   deleteDocument,
   archiveDocument,
   restoreDocument,
@@ -14,16 +15,14 @@ import {
   getSignedDownloadUrl,
   reindexDocument,
 } from "@/app/actions/storage";
+import { extractSearchTextWithOcr } from "@/app/actions/indexing";
 
-type UploadIndexingStatus =
-  | "uploaded"
-  | "scanning_content"
-  | "ocr_processing"
-  | "indexed"
-  | "failed_to_extract_text";
-
-function isImageUpload(file: File) {
-  return file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
+function isOcrCandidate(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.type.startsWith("image/") ||
+    /\.(pdf|png|jpe?g|webp)$/i.test(file.name)
+  );
 }
 
 export function useFiles(teamId: string | null, folderId: string | null) {
@@ -58,14 +57,26 @@ export function useUploadDocument() {
       teamId,
       folderId,
       isPrivate,
-      onIndexingStatus,
+      extractedText,
     }: {
       file: File;
       teamId: string;
       folderId: string | null;
       isPrivate: boolean;
-      onIndexingStatus?: (status: UploadIndexingStatus, message?: string) => void;
+      extractedText?: string;
     }) => {
+      let searchableText = extractedText?.trim();
+
+      if (!searchableText && isOcrCandidate(file)) {
+        try {
+          const ocrFormData = new FormData();
+          ocrFormData.append("file", file);
+          searchableText = (await extractSearchTextWithOcr(ocrFormData)) ?? undefined;
+        } catch (error) {
+          console.warn("OCR indexing failed:", error);
+        }
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("teamId", teamId);
@@ -80,25 +91,18 @@ export function useUploadDocument() {
 
       const record = result.file;
 
-      onIndexingStatus?.("uploaded");
-      onIndexingStatus?.(isImageUpload(file) ? "ocr_processing" : "scanning_content");
-      const indexResult = await reindexDocument(record.id);
-      if (indexResult.ok) {
-        onIndexingStatus?.(
-          (indexResult.status as UploadIndexingStatus | undefined) ??
-            (indexResult.indexed ? "indexed" : "failed_to_extract_text"),
-          indexResult.message
-        );
-      } else {
-        onIndexingStatus?.("failed_to_extract_text", indexResult.error);
-        console.warn("File uploaded, but search indexing failed:", indexResult.error);
+      if (searchableText) {
+        try {
+          await saveDocumentContent(record.id, searchableText);
+        } catch (error) {
+          console.warn("File uploaded, but search indexing failed:", error);
+        }
       }
 
       return record;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
-      queryClient.invalidateQueries({ queryKey: ["search"] });
     },
   });
 }
@@ -173,7 +177,6 @@ export function useReindexDocument() {
   return useMutation({
     mutationFn: (fileId: string) => reindexDocument(fileId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["files"] });
       queryClient.invalidateQueries({ queryKey: ["search"] });
     },
   });

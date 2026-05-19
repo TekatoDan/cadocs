@@ -16,7 +16,6 @@ import {
   Download,
   Lock,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRenameDocument } from "@/hooks/use-files";
@@ -31,11 +30,9 @@ interface FileRowProps {
   currentUserId: string | undefined;
   teamMembers: TeamMember[];
   columns: ColumnConfig;
-  isReindexing: boolean;
   onPreview: (file: UploadedFileRecord) => void;
   onDownload: (storagePath: string, fileName: string) => void;
   onDelete: (file: UploadedFileRecord) => void;
-  onReindex: (file: UploadedFileRecord) => void;
   onStar: (fileId: string) => void;
   onRestore: (fileId: string) => void;
   onDragStart: (e: React.DragEvent, type: "file", id: string) => void;
@@ -97,48 +94,6 @@ function formatSize(bytes: number): string {
   return `${mb.toFixed(2)} MB`;
 }
 
-function getIndexingStatusMeta(file: UploadedFileRecord) {
-  const status = file.indexing_status ?? "uploaded";
-
-  if (status === "scanning_content") {
-    return {
-      label: "Scanning content",
-      className:
-        "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800/50",
-    };
-  }
-
-  if (status === "ocr_processing") {
-    return {
-      label: "OCR processing",
-      className:
-        "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-900/20 dark:text-cyan-300 dark:ring-cyan-800/50",
-    };
-  }
-
-  if (status === "indexed") {
-    return {
-      label: "Indexed",
-      className:
-        "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800/50",
-    };
-  }
-
-  if (status === "failed_to_extract_text") {
-    return {
-      label: "Text extraction failed",
-      className:
-        "bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800/50",
-    };
-  }
-
-  return {
-    label: "Uploaded",
-    className:
-      "bg-slate-50 text-slate-600 ring-slate-200 dark:bg-navy-800 dark:text-slate-300 dark:ring-navy-700",
-  };
-}
-
 export function FileRow({
   file,
   canEdit,
@@ -148,11 +103,9 @@ export function FileRow({
   currentUserId,
   teamMembers,
   columns,
-  isReindexing,
   onPreview,
   onDownload,
   onDelete,
-  onReindex,
   onStar,
   onRestore,
   onDragStart,
@@ -166,10 +119,7 @@ export function FileRow({
   const renameMutation = useRenameDocument();
 
   const { icon: FileIcon, color: iconColor, bg: iconBg } = getFileIcon(file.name);
-  const isPrivate = file.description === "__VISIBILITY_PRIVATE__";
-  const indexingStatus = getIndexingStatusMeta(file);
-  const canRetryIndexing =
-    canEdit && file.indexing_status === "failed_to_extract_text";
+  const isPrivate = file.status === "private";
 
   useEffect(() => {
     if (isRenaming) {
@@ -240,43 +190,30 @@ export function FileRow({
           >
             <FileIcon className={cn("h-5 w-5 stroke-[1.8]", iconColor)} />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              {isRenaming ? (
-                <input
-                  ref={renameInputRef}
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onKeyDown={handleRenameKeyDown}
-                  onBlur={handleRenameSubmit}
-                  onClick={(e) => e.stopPropagation()}
-                  className={cn(
-                    "min-w-0 max-w-full rounded-md border px-2 py-1 text-sm outline-none",
-                    "border-indigo-500 bg-white text-slate-900 ring-2 ring-indigo-500/20",
-                    "dark:bg-navy-900 dark:text-white"
-                  )}
-                />
-              ) : (
-                <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={file.name}>
-                  {file.name}
-                </span>
-              )}
-              {isPrivate && (
-                <Lock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-              )}
-            </div>
-            <div className="mt-1 flex min-w-0 items-center gap-2">
-              <span
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {isRenaming ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={handleRenameKeyDown}
+                onBlur={handleRenameSubmit}
+                onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1",
-                  indexingStatus.className
+                  "min-w-0 max-w-full rounded-md border px-2 py-1 text-sm outline-none",
+                  "border-indigo-500 bg-white text-slate-900 ring-2 ring-indigo-500/20",
+                  "dark:bg-navy-900 dark:text-white"
                 )}
-                title={file.indexing_error ?? indexingStatus.label}
-              >
-                {indexingStatus.label}
+              />
+            ) : (
+              <span className="block min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" title={file.name}>
+                {file.name}
               </span>
-            </div>
+            )}
+            {isPrivate && (
+              <Lock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+            )}
           </div>
         </div>
       </td>
@@ -364,25 +301,6 @@ export function FileRow({
           >
             <Download className="h-4 w-4" />
           </button>
-
-          {canRetryIndexing && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onReindex(file);
-              }}
-              disabled={isReindexing}
-              className="app-focus-ring rounded-lg p-2 text-slate-400 transition-colors hover:bg-cyan-50 hover:text-cyan-600 dark:hover:bg-cyan-900/20 dark:hover:text-cyan-300"
-              title="Retry text extraction"
-              aria-label={`Retry text extraction for ${file.name}`}
-            >
-              {isReindexing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </button>
-          )}
 
           {canEdit && (
             <button
