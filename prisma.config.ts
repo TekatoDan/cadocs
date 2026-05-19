@@ -11,10 +11,7 @@ const config: Parameters<typeof defineConfig>[0] = {
   },
 };
 
-if (
-  process.env["SHADOW_DATABASE_URL"] &&
-  process.env["SHADOW_DATABASE_URL"] !== process.env["DATABASE_URL"]
-) {
+if (process.env["SHADOW_DATABASE_URL"]) {
   config.datasource!.shadowDatabaseUrl = process.env["SHADOW_DATABASE_URL"];
 }
 
