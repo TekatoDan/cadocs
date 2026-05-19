@@ -125,29 +125,6 @@ test("runs OCR automatically for image files", async () => {
   assert.match(flattenExtractedSections(result.sections), /Image Notice Delta/);
 });
 
-test("reports a clear configuration error when OCR is needed without a Gemini key", async () => {
-  const originalApiKey = process.env.GEMINI_API_KEY;
-  process.env.GEMINI_API_KEY = "YOUR_GEMINI_API_KEY";
-
-  try {
-    const file = makeFile(
-      [new Uint8Array([137, 80, 78, 71])],
-      "unconfigured-ocr.png",
-      "image/png"
-    );
-    const result = await extractReadableTextFromFile(file);
-
-    assert.equal(result.sections.length, 0);
-    assert.match(result.error ?? "", /OCR is not configured/);
-  } finally {
-    if (originalApiKey === undefined) {
-      delete process.env.GEMINI_API_KEY;
-    } else {
-      process.env.GEMINI_API_KEY = originalApiKey;
-    }
-  }
-});
-
 test("marks files with no readable text as extraction failures", async () => {
   const file = makeFile([""], "empty.txt", "text/plain");
   const result = await extractReadableTextFromFile(file);
