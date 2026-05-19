@@ -93,8 +93,12 @@ model File {
   storagePath String    @map("storage_path")
   sizeBytes   BigInt    @map("size_bytes")
   mimeType    String    @map("mime_type")
+  contentHash String?   @map("content_hash")
   version     Int       @default(1)
   status      String    @default("draft")
+  indexingStatus String  @default("uploaded") @map("indexing_status")
+  indexingError  String? @map("indexing_error")
+  indexedAt      DateTime? @map("indexed_at") @db.Timestamptz(6)
   lockedBy    String?   @map("locked_by") @db.Uuid
   lockedAt    DateTime? @map("locked_at") @db.Timestamptz(6)
   createdBy   String?   @map("created_by") @db.Uuid
@@ -134,10 +138,15 @@ model DocumentContent {
   fileId     String   @map("file_id") @db.Uuid
   chunkIndex Int      @map("chunk_index")
   content    String
+  pageNumber Int?     @map("page_number")
+  section    String?
+  source     String   @default("extracted")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
+  @@unique([fileId, chunkIndex])
+  @@index([fileId, pageNumber])
   @@map("document_contents")
   @@schema("public")
 }

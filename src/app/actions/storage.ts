@@ -1,12 +1,14 @@
 "use server";
 
+import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser, getSupabaseClient } from "@/lib/auth";
 import { STORAGE_BUCKET } from "@/lib/storage-bucket";
 import {
-  extractSearchTextFromFileWithOcr,
-  extractSearchTextFromPdfFile,
-} from "@/app/actions/indexing";
+  extractReadableTextFromFile,
+  inferMimeType as inferDocumentMimeType,
+  type ExtractedTextSection,
+} from "@/lib/document-text-extraction";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
 const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
@@ -17,7 +19,7 @@ type UploadDocumentResult =
   | { ok: false; error: string };
 
 type ReindexDocumentResult =
-  | { ok: true; indexed: boolean; message: string }
+  | { ok: true; indexed: boolean; message: string; status?: string }
   | { ok: false; error: string };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -60,33 +62,7 @@ function shortenFileName(fileName: string, maxLength: number, suffix = "") {
 }
 
 function inferMimeType(fileName: string) {
-  const lowerName = fileName.toLowerCase();
-  if (lowerName.endsWith(".pdf")) return "application/pdf";
-  if (lowerName.endsWith(".png")) return "image/png";
-  if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) return "image/jpeg";
-  if (lowerName.endsWith(".webp")) return "image/webp";
-  if (lowerName.endsWith(".gif")) return "image/gif";
-  if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) return "text/plain";
-  if (lowerName.endsWith(".csv")) return "text/csv";
-  return "application/octet-stream";
-}
-
-function isTextSearchableFile(fileName: string, mimeType: string) {
-  return (
-    mimeType.startsWith("text/") ||
-    /\.(txt|md|csv|json|log)$/i.test(fileName)
-  );
-}
-
-function isPdfFile(fileName: string, mimeType: string) {
-  return mimeType === "application/pdf" || /\.pdf$/i.test(fileName);
-}
-
-function isImageFile(fileName: string, mimeType: string) {
-  return (
-    mimeType.startsWith("image/") ||
-    /\.(png|jpe?g|webp)$/i.test(fileName)
-  );
+  return inferDocumentMimeType(fileName);
 }
 
 async function getAvailableFileName(
@@ -123,6 +99,9 @@ function serializeFile(file: any): UploadedFileRecord {
     size_bytes: Number(file.sizeBytes),
     mime_type: file.mimeType,
     storage_path: file.storagePath,
+    indexing_status: file.indexingStatus,
+    indexing_error: file.indexingError,
+    indexed_at: file.indexedAt?.toISOString() ?? null,
     team_id: file.teamId,
     folder_id: file.folderId,
     created_at: file.createdAt.toISOString(),
@@ -280,19 +259,50 @@ export async function uploadDocument(
       };
     }
 
+    const mimeType = file.type || inferMimeType(file.name);
+    const arrayBuffer = await file.arrayBuffer();
+    const contentHash = createHash("sha256")
+      .update(Buffer.from(arrayBuffer))
+      .digest("hex");
+    const duplicateName = shortenFileName(file.name, maxFileNameLength);
+    const duplicate = await prisma.file.findFirst({
+      where: {
+        teamId,
+        folderId,
+        name: duplicateName,
+        contentHash,
+        status: { not: "archived" },
+        description: isPrivate ? "__VISIBILITY_PRIVATE__" : null,
+        OR: isPrivate
+          ? [{ createdBy: user.id }]
+          : [{ description: null }, { description: { not: "__VISIBILITY_PRIVATE__" } }],
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    if (duplicate) {
+      const updatedDuplicate = await prisma.file.update({
+        where: { id: duplicate.id },
+        data: {
+          indexingStatus: "uploaded",
+          indexingError: null,
+          indexedAt: null,
+        },
+      });
+      return { ok: true, file: serializeFile(updatedDuplicate) };
+    }
+
     const displayName = await getAvailableFileName(
       teamId,
       folderId || null,
       file.name,
       maxFileNameLength
     );
-    const mimeType = file.type || inferMimeType(file.name);
 
     const fileExt = file.name.split(".").pop();
     const uniqueId = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
     storagePath = `${teamId}/${uniqueId}${fileExt ? `.${fileExt}` : ""}`;
 
-    const arrayBuffer = await file.arrayBuffer();
     const { error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(storagePath, arrayBuffer, {
@@ -325,7 +335,9 @@ export async function uploadDocument(
         storagePath,
         sizeBytes: BigInt(file.size),
         mimeType,
+        contentHash,
         status: "draft",
+        indexingStatus: "uploaded",
         createdBy: user.id,
       },
     });
@@ -353,32 +365,49 @@ export async function saveDocumentContent(
   content: string
 ): Promise<void> {
   await getAuthUser();
-  await saveDocumentContentForFile(fileId, content);
+  await saveDocumentSectionsForFile(fileId, [
+    { content, source: "manual" },
+  ]);
+  await markFileIndexed(fileId);
 }
 
-async function saveDocumentContentForFile(
+async function saveDocumentSectionsForFile(
   fileId: string,
-  content: string
+  sections: ExtractedTextSection[]
 ): Promise<void> {
-  const normalizedContent = content
-    .replace(/\u0000/g, "")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  if (!normalizedContent) return;
-
-  const chunks = chunkDocumentContent(normalizedContent);
+  const chunks = sections.flatMap((section) =>
+    chunkDocumentContent(section.content).map((chunk) => ({
+      content: chunk,
+      pageNumber: section.pageNumber ?? null,
+      section: section.section ?? null,
+      source: section.source || "extracted",
+    }))
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.documentContent.deleteMany({ where: { fileId } });
+    if (chunks.length === 0) return;
     await tx.documentContent.createMany({
       data: chunks.map((chunk, index) => ({
         fileId,
         chunkIndex: index,
-        content: chunk,
+        content: chunk.content,
+        pageNumber: chunk.pageNumber,
+        section: chunk.section,
+        source: chunk.source,
       })),
     });
+  });
+}
+
+async function markFileIndexed(fileId: string) {
+  await prisma.file.update({
+    where: { id: fileId },
+    data: {
+      indexingStatus: "indexed",
+      indexingError: null,
+      indexedAt: new Date(),
+    },
   });
 }
 
@@ -409,58 +438,109 @@ export async function reindexDocument(
     }
 
     const mimeType = file.mimeType || inferMimeType(file.name);
+    await prisma.file.update({
+      where: { id: file.id },
+      data: {
+        indexingStatus: "scanning_content",
+        indexingError: null,
+        indexedAt: null,
+      },
+    });
+
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
       .download(file.storagePath);
 
     if (error || !data) {
+      const reason = error?.message || "Unable to read this file from storage.";
+      await prisma.$transaction(async (tx) => {
+        await tx.documentContent.deleteMany({ where: { fileId: file.id } });
+        await tx.file.update({
+          where: { id: file.id },
+          data: {
+            indexingStatus: "failed_to_extract_text",
+            indexingError: reason,
+            indexedAt: null,
+          },
+        });
+      });
       return {
         ok: false,
-        error: error?.message || "Unable to read this file from storage.",
+        error: reason,
       };
     }
 
     const storedFile = new File([data], file.name, { type: mimeType });
-    let searchableText: string | null = null;
+    const extraction = await extractReadableTextFromFile(storedFile, {
+      onStatus: async (status) => {
+        await prisma.file.update({
+          where: { id: file.id },
+          data: {
+            indexingStatus: status,
+            indexingError: null,
+          },
+        });
+      },
+    });
 
-    if (isTextSearchableFile(file.name, mimeType)) {
-      searchableText = await data.text();
-    } else if (isPdfFile(file.name, mimeType)) {
-      searchableText = await extractSearchTextFromPdfFile(storedFile);
-      if (!searchableText) {
-        searchableText = await extractSearchTextFromFileWithOcr(storedFile);
-      }
-    } else if (isImageFile(file.name, mimeType)) {
-      searchableText = await extractSearchTextFromFileWithOcr(storedFile);
-    } else {
+    if (extraction.warnings.length > 0) {
+      console.warn("Document text extraction warnings:", {
+        fileId: file.id,
+        fileName: file.name,
+        warnings: extraction.warnings,
+      });
+    }
+
+    if (extraction.error || extraction.sections.length === 0) {
+      const reason = extraction.error || "No searchable text was found in this file.";
+      console.error("Document text extraction failed:", {
+        fileId: file.id,
+        fileName: file.name,
+        reason,
+      });
+      await prisma.$transaction(async (tx) => {
+        await tx.documentContent.deleteMany({ where: { fileId: file.id } });
+        await tx.file.update({
+          where: { id: file.id },
+          data: {
+            indexingStatus: "failed_to_extract_text",
+            indexingError: reason,
+            indexedAt: null,
+          },
+        });
+      });
       return {
         ok: true,
         indexed: false,
-        message: "This file type does not support search indexing yet.",
+        status: "failed_to_extract_text",
+        message: reason,
       };
     }
 
-    if (!searchableText?.trim()) {
-      const needsOcr = isPdfFile(file.name, mimeType) || isImageFile(file.name, mimeType);
-      return {
-        ok: true,
-        indexed: false,
-        message:
-          needsOcr && !process.env.GEMINI_API_KEY
-            ? "No embedded text was found. Add GEMINI_API_KEY to index scanned PDFs and images."
-            : "No searchable text was found in this file.",
-      };
-    }
-
-    await saveDocumentContentForFile(file.id, searchableText);
+    await saveDocumentSectionsForFile(file.id, extraction.sections);
+    await markFileIndexed(file.id);
 
     return {
       ok: true,
       indexed: true,
+      status: "indexed",
       message: "Search index updated.",
     };
   } catch (error) {
+    try {
+      await prisma.file.update({
+        where: { id: fileId },
+        data: {
+          indexingStatus: "failed_to_extract_text",
+          indexingError: getErrorMessage(error, "Unable to update the search index."),
+          indexedAt: null,
+        },
+      });
+    } catch (statusError) {
+      console.error("Failed to mark file indexing error:", statusError);
+    }
+    console.error("Document reindex failed:", error);
     return {
       ok: false,
       error: getErrorMessage(error, "Unable to update the search index."),
@@ -469,27 +549,34 @@ export async function reindexDocument(
 }
 
 function chunkDocumentContent(content: string, chunkSize = 4000): string[] {
+  const normalizedContent = content
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!normalizedContent) return [];
+
   const chunks: string[] = [];
   let cursor = 0;
 
-  while (cursor < content.length) {
-    let end = Math.min(cursor + chunkSize, content.length);
-    if (end < content.length) {
-      const paragraphBreak = content.lastIndexOf("\n\n", end);
-      const sentenceBreak = content.lastIndexOf(". ", end);
-      const spaceBreak = content.lastIndexOf(" ", end);
+  while (cursor < normalizedContent.length) {
+    let end = Math.min(cursor + chunkSize, normalizedContent.length);
+    if (end < normalizedContent.length) {
+      const paragraphBreak = normalizedContent.lastIndexOf("\n\n", end);
+      const sentenceBreak = normalizedContent.lastIndexOf(". ", end);
+      const spaceBreak = normalizedContent.lastIndexOf(" ", end);
       const breakAt = Math.max(paragraphBreak, sentenceBreak, spaceBreak);
       if (breakAt > cursor + chunkSize * 0.6) {
         end = breakAt + (breakAt === sentenceBreak ? 1 : 0);
       }
     }
 
-    const chunk = content.slice(cursor, end).trim();
+    const chunk = normalizedContent.slice(cursor, end).trim();
     if (chunk) chunks.push(chunk);
     cursor = end;
   }
 
-  return chunks.length > 0 ? chunks : [content];
+  return chunks;
 }
 
 export async function getTeamFiles(

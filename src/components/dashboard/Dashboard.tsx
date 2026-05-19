@@ -487,6 +487,16 @@ export default function Dashboard() {
     }
   }, [selectedFiles, reindexDocumentMutation]);
 
+  const handleReindexFile = useCallback(
+    async (file: UploadedFileRecord) => {
+      const result = await reindexDocumentMutation.mutateAsync(file.id);
+      if (!result.ok || !result.indexed) {
+        window.alert(result.ok ? result.message : result.error);
+      }
+    },
+    [reindexDocumentMutation]
+  );
+
   // Download handler
   const handleDownload = useCallback(async (storagePath: string, fileName: string) => {
     try {
@@ -812,6 +822,7 @@ export default function Dashboard() {
                   onPreviewFile={setPreviewFile}
                   onDownloadFile={handleDownload}
                   onDeleteFile={setFileToDelete}
+                  onReindexFile={handleReindexFile}
                   onDeleteFolder={setFolderToDelete}
                   onStarFile={toggleStarFile}
                   onStarFolder={toggleStarFolder}

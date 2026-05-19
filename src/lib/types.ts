@@ -17,6 +17,9 @@ export interface UploadedFileRecord {
   size_bytes: number;
   mime_type: string;
   status: string;
+  indexing_status?: string | null;
+  indexing_error?: string | null;
+  indexed_at?: string | null;
   created_at: string;
   created_by: string | null;
 }
@@ -25,6 +28,8 @@ export interface FileSearchResult {
   id: string;
   type: "file";
   content: string;
+  page_number?: number | null;
+  section?: string | null;
   files: {
     id: string;
     name: string;
@@ -32,6 +37,9 @@ export interface FileSearchResult {
     storage_path: string;
     mime_type: string;
     size_bytes: number;
+    indexing_status?: string | null;
+    indexing_error?: string | null;
+    indexed_at?: string | null;
     created_at: string;
     created_by: string | null;
     description?: string | null;

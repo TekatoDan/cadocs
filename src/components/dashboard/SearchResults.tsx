@@ -54,6 +54,29 @@ function formatTimeAgo(dateString: string): string {
   });
 }
 
+function formatUploadDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getFileTypeLabel(mimeType: string, fileName: string): string {
+  const ext = fileName.split(".").pop()?.toUpperCase();
+  if (mimeType === "application/pdf" || ext === "PDF") return "PDF";
+  if (mimeType.includes("word") || ext === "DOCX" || ext === "DOC") {
+    return ext || "Document";
+  }
+  if (mimeType.includes("spreadsheet") || ext === "XLSX" || ext === "XLS") {
+    return ext || "Spreadsheet";
+  }
+  if (mimeType.includes("presentation") || ext === "PPTX") return ext || "PPTX";
+  if (mimeType.startsWith("image/")) return ext || "Image";
+  if (mimeType.startsWith("text/")) return ext || "Text";
+  return ext || "File";
+}
+
 function highlightText(
   text: string,
   query: string
@@ -204,9 +227,16 @@ export function SearchResults({
           size_bytes: file.size_bytes,
           mime_type: file.mime_type,
           status: "active",
+          indexing_status: file.indexing_status,
+          indexing_error: file.indexing_error,
+          indexed_at: file.indexed_at,
           created_at: file.created_at,
           created_by: file.created_by,
         };
+        const fileType = getFileTypeLabel(file.mime_type, file.name);
+        const locationLabel = result.page_number
+          ? `Page ${result.page_number}`
+          : result.section || null;
 
         return (
           <div
@@ -222,16 +252,26 @@ export function SearchResults({
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 shrink-0 text-indigo-500" />
                   <h3 className="truncate text-sm font-medium text-slate-900 dark:text-white">
-                    {file.name}
+                    {highlightText(file.name, searchQuery) || file.name}
                   </h3>
                   {isPrivate && (
                     <Lock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                   )}
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <span>{ownerName}</span>
                   <span>&middot;</span>
+                  <span>{fileType}</span>
+                  <span>&middot;</span>
+                  <span>Uploaded {formatUploadDate(file.created_at)}</span>
+                  <span>&middot;</span>
                   <span>{timeAgo}</span>
+                  {locationLabel && (
+                    <>
+                      <span>&middot;</span>
+                      <span>{locationLabel}</span>
+                    </>
+                  )}
                 </div>
                 {result.content && (
                   <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">

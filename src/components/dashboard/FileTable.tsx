@@ -44,6 +44,7 @@ interface FileTableProps {
   onPreviewFile: (file: UploadedFileRecord) => void;
   onDownloadFile: (storagePath: string, fileName: string) => void;
   onDeleteFile: (file: UploadedFileRecord) => void;
+  onReindexFile: (file: UploadedFileRecord) => void;
   onDeleteFolder: (folder: FolderRecord) => void;
   onStarFile: (fileId: string) => void;
   onStarFolder: (folderId: string) => void;
@@ -120,6 +121,7 @@ export function FileTable({
   onPreviewFile,
   onDownloadFile,
   onDeleteFile,
+  onReindexFile,
   onDeleteFolder,
   onStarFile,
   onStarFolder,
@@ -463,9 +465,11 @@ export function FileTable({
                   currentUserId={currentUserId}
                   teamMembers={teamMembers}
                   columns={columns}
+                  isReindexing={isBulkActionPending}
                   onPreview={onPreviewFile}
                   onDownload={onDownloadFile}
                   onDelete={onDeleteFile}
+                  onReindex={onReindexFile}
                   onStar={onStarFile}
                   onRestore={onRestoreFile}
                   onDragStart={onDragStart}
