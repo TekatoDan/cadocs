@@ -50,11 +50,21 @@ export interface ExtractReadableTextOptions {
 
 const OCR_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const OCR_MODEL = process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash";
+const OCR_NOT_CONFIGURED_MESSAGE =
+  "OCR is not configured. Add a valid GEMINI_API_KEY to scan images and scanned PDFs, then retry text extraction.";
 const PDF_MIN_TEXT_CHARS = 8;
 const PDF_MULTI_PAGE_MIN_TEXT_CHARS = 20;
 
 function getMimeType(file: File) {
   return file.type || inferMimeType(file.name);
+}
+
+function getGeminiApiKey() {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY" || apiKey.startsWith("YOUR_")) {
+    return null;
+  }
+  return apiKey;
 }
 
 export function inferMimeType(fileName: string) {
@@ -515,9 +525,9 @@ async function extractTextWithGeminiOcr(
   fileKind: DocumentFileKind,
   pageCount?: number
 ): Promise<ExtractedTextSection[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured for OCR extraction.");
+    throw new Error(OCR_NOT_CONFIGURED_MESSAGE);
   }
 
   if (file.size === 0) {
