@@ -7,7 +7,6 @@ import { STORAGE_BUCKET } from "@/lib/storage-bucket";
 import {
   extractReadableTextFromFile,
   inferMimeType as inferDocumentMimeType,
-  isOcrNotConfiguredError,
   type ExtractedTextSection,
 } from "@/lib/document-text-extraction";
 import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
@@ -495,9 +494,6 @@ export async function reindexDocument(
 
     if (extraction.error || extraction.sections.length === 0) {
       const reason = extraction.error || "No searchable text was found in this file.";
-      const indexingStatus = isOcrNotConfiguredError(reason)
-        ? "ocr_not_configured"
-        : "failed_to_extract_text";
       console.error("Document text extraction failed:", {
         fileId: file.id,
         fileName: file.name,
@@ -508,7 +504,7 @@ export async function reindexDocument(
         await tx.file.update({
           where: { id: file.id },
           data: {
-            indexingStatus,
+            indexingStatus: "failed_to_extract_text",
             indexingError: reason,
             indexedAt: null,
           },
@@ -517,7 +513,7 @@ export async function reindexDocument(
       return {
         ok: true,
         indexed: false,
-        status: indexingStatus,
+        status: "failed_to_extract_text",
         message: reason,
       };
     }

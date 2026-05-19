@@ -18,7 +18,6 @@ export type DocumentIndexingStatus =
   | "scanning_content"
   | "ocr_processing"
   | "indexed"
-  | "ocr_not_configured"
   | "failed_to_extract_text";
 
 export interface ExtractedTextSection {
@@ -52,9 +51,7 @@ export interface ExtractReadableTextOptions {
 const OCR_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const OCR_MODEL = process.env.GEMINI_OCR_MODEL || "gemini-2.5-flash";
 const OCR_NOT_CONFIGURED_MESSAGE =
-  "Uploaded. OCR is not configured yet, so scanned PDFs and images will be searchable by filename only until a valid GEMINI_API_KEY is added.";
-const OCR_ACCESS_DENIED_MESSAGE =
-  "Uploaded. The configured Gemini project was denied OCR access, so scanned PDFs and images will be searchable by filename only until a working GEMINI_API_KEY is added.";
+  "OCR is not configured. Add a valid GEMINI_API_KEY to scan images and scanned PDFs, then retry text extraction.";
 const PDF_MIN_TEXT_CHARS = 8;
 const PDF_MULTI_PAGE_MIN_TEXT_CHARS = 20;
 
@@ -155,16 +152,6 @@ export function flattenExtractedSections(sections: ExtractedTextSection[]) {
     .map((section) => normalizeExtractedText(section.content))
     .filter(Boolean)
     .join("\n\n");
-}
-
-export function isOcrNotConfiguredError(message: string | undefined) {
-  return (
-    !!message &&
-    (message.includes("OCR is not configured") ||
-      message.includes("denied OCR access") ||
-      message.includes("PERMISSION_DENIED") ||
-      message.includes("Your project has been denied access"))
-  );
 }
 
 export async function extractReadableTextFromFile(
@@ -571,26 +558,13 @@ async function extractTextWithGeminiOcr(
         "Do not summarize and do not add commentary.",
       ].join(" ");
 
-  let response;
-  try {
-    response = await ai.models.generateContent({
-      model: OCR_MODEL,
-      contents: [
-        { text: prompt },
-        createPartFromBase64(bytes.toString("base64"), mimeType),
-      ],
-    });
-  } catch (error) {
-    const message = getErrorText(error);
-    if (
-      message.includes("PERMISSION_DENIED") ||
-      message.includes("Your project has been denied access") ||
-      message.includes('"code":403')
-    ) {
-      throw new Error(OCR_ACCESS_DENIED_MESSAGE);
-    }
-    throw error;
-  }
+  const response = await ai.models.generateContent({
+    model: OCR_MODEL,
+    contents: [
+      { text: prompt },
+      createPartFromBase64(bytes.toString("base64"), mimeType),
+    ],
+  });
   const responseText = response.text ?? "";
   const parsed = parseOcrJson(responseText);
 
@@ -609,18 +583,6 @@ async function extractTextWithGeminiOcr(
       source: "ocr",
     },
   ];
-}
-
-function getErrorText(error: unknown) {
-  if (error instanceof Error) {
-    return `${error.message} ${JSON.stringify(error)}`;
-  }
-
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
 }
 
 function parseOcrJson(value: string): ExtractedTextSection[] {

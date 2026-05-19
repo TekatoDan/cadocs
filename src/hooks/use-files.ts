@@ -20,7 +20,6 @@ type UploadIndexingStatus =
   | "scanning_content"
   | "ocr_processing"
   | "indexed"
-  | "ocr_not_configured"
   | "failed_to_extract_text";
 
 function isImageUpload(file: File) {
@@ -83,25 +82,16 @@ export function useUploadDocument() {
 
       onIndexingStatus?.("uploaded");
       onIndexingStatus?.(isImageUpload(file) ? "ocr_processing" : "scanning_content");
-      try {
-        const indexResult = await reindexDocument(record.id);
-        if (indexResult.ok) {
-          onIndexingStatus?.(
-            (indexResult.status as UploadIndexingStatus | undefined) ??
-              (indexResult.indexed ? "indexed" : "failed_to_extract_text"),
-            indexResult.message
-          );
-        } else {
-          onIndexingStatus?.("uploaded", indexResult.error);
-          console.warn("File uploaded, but search indexing failed:", indexResult.error);
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Search indexing could not be started.";
-        onIndexingStatus?.("uploaded", message);
-        console.warn("File uploaded, but search indexing could not be started:", error);
+      const indexResult = await reindexDocument(record.id);
+      if (indexResult.ok) {
+        onIndexingStatus?.(
+          (indexResult.status as UploadIndexingStatus | undefined) ??
+            (indexResult.indexed ? "indexed" : "failed_to_extract_text"),
+          indexResult.message
+        );
+      } else {
+        onIndexingStatus?.("failed_to_extract_text", indexResult.error);
+        console.warn("File uploaded, but search indexing failed:", indexResult.error);
       }
 
       return record;
