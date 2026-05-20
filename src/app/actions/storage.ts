@@ -11,9 +11,21 @@ import type { FolderRecord, UploadedFileRecord } from "@/lib/types";
 
 const DEFAULT_MAX_FILE_NAME_LENGTH = 80;
 const MIN_FILE_NAME_LENGTH = 16;
+const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+const STORAGE_PATH_ID_LENGTH = 16;
 
 type UploadDocumentResult =
   | { ok: true; file: UploadedFileRecord }
+  | { ok: false; error: string };
+
+type PrepareDocumentUploadResult =
+  | {
+      ok: true;
+      bucket: string;
+      storagePath: string;
+      token: string;
+      mimeType: string;
+    }
   | { ok: false; error: string };
 
 type ReindexDocumentResult =
@@ -42,8 +54,20 @@ function splitFileName(fileName: string) {
   };
 }
 
+function normalizeFileName(fileName: string) {
+  const fallbackName = "uploaded-file";
+  const normalizedName = fileName
+    .normalize("NFC")
+    .replace(/[/\\]/g, "-")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalizedName || fallbackName;
+}
+
 function shortenFileName(fileName: string, maxLength: number, suffix = "") {
-  const normalizedName = fileName.replace(/\s+/g, " ").trim();
+  const normalizedName = normalizeFileName(fileName);
   if (normalizedName.length <= maxLength && !suffix) return normalizedName;
 
   const { baseName, extension } = splitFileName(normalizedName);
@@ -59,6 +83,11 @@ function shortenFileName(fileName: string, maxLength: number, suffix = "") {
   return `${shortenedBase}${suffix}${extension}`;
 }
 
+function getFileExtension(fileName: string) {
+  const { extension } = splitFileName(normalizeFileName(fileName));
+  return /^[a-z0-9.]+$/i.test(extension) ? extension.toLowerCase() : "";
+}
+
 function inferMimeType(fileName: string) {
   const lowerName = fileName.toLowerCase();
   if (lowerName.endsWith(".pdf")) return "application/pdf";
@@ -69,6 +98,37 @@ function inferMimeType(fileName: string) {
   if (lowerName.endsWith(".txt") || lowerName.endsWith(".md")) return "text/plain";
   if (lowerName.endsWith(".csv")) return "text/csv";
   return "application/octet-stream";
+}
+
+function getUploadMimeType(fileName: string, mimeType: string | null) {
+  const normalizedMimeType = mimeType?.trim();
+  if (normalizedMimeType) return normalizedMimeType;
+  return inferMimeType(fileName);
+}
+
+function getUploadStoragePath(teamId: string, fileName: string) {
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, STORAGE_PATH_ID_LENGTH)
+      : Math.random().toString(36).slice(2, 2 + STORAGE_PATH_ID_LENGTH);
+  const extension = getFileExtension(fileName);
+
+  return `${teamId}/${id}_${Date.now()}${extension}`;
+}
+
+function isStoragePathForTeam(storagePath: string, teamId: string) {
+  return storagePath.startsWith(`${teamId}/`) && !storagePath.includes("..");
+}
+
+async function removeStorageObject(storagePath: string | null) {
+  if (!storagePath) return;
+
+  try {
+    const supabase = await getSupabaseClient();
+    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+  } catch (cleanupError) {
+    console.error("Failed to clean up uploaded object:", cleanupError);
+  }
 }
 
 function isTextSearchableFile(fileName: string, mimeType: string) {
@@ -340,6 +400,149 @@ export async function uploadDocument(
         console.error("Failed to clean up uploaded object:", cleanupError);
       }
     }
+
+    return {
+      ok: false,
+      error: getErrorMessage(error, "Upload failed. Please try again."),
+    };
+  }
+}
+
+export async function prepareDocumentUpload(
+  formData: FormData
+): Promise<PrepareDocumentUploadResult> {
+  try {
+    await getAuthUser();
+    const supabase = await getSupabaseClient();
+
+    const teamId = formData.get("teamId") as string | null;
+    const fileName = formData.get("fileName") as string | null;
+    const mimeType = getUploadMimeType(
+      fileName ?? "",
+      formData.get("mimeType") as string | null
+    );
+    const fileSize = Number(formData.get("fileSize"));
+
+    if (!teamId || !fileName) {
+      return {
+        ok: false,
+        error: "Upload is missing the file name or destination team.",
+      };
+    }
+
+    if (!Number.isFinite(fileSize) || fileSize <= 0) {
+      return { ok: false, error: "Upload file is empty or unreadable." };
+    }
+
+    if (fileSize > MAX_UPLOAD_SIZE_BYTES) {
+      return {
+        ok: false,
+        error: `Uploads are limited to ${Math.round(
+          MAX_UPLOAD_SIZE_BYTES / (1024 * 1024)
+        )} MB.`,
+      };
+    }
+
+    const storagePath = getUploadStoragePath(teamId, fileName);
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUploadUrl(storagePath);
+
+    if (error || !data) {
+      return {
+        ok: false,
+        error:
+          error?.message === "Bucket not found"
+            ? `Storage bucket "${STORAGE_BUCKET}" was not found. Create it in Supabase Storage or set SUPABASE_STORAGE_BUCKET to the existing bucket id.`
+            : `Storage upload could not be prepared: ${
+                error?.message || "No upload token was returned."
+              }`,
+      };
+    }
+
+    return {
+      ok: true,
+      bucket: STORAGE_BUCKET,
+      storagePath,
+      token: data.token,
+      mimeType,
+    };
+  } catch (error) {
+    console.error("Document upload preparation failed:", error);
+    return {
+      ok: false,
+      error: getErrorMessage(error, "Upload could not be prepared."),
+    };
+  }
+}
+
+export async function finalizeDocumentUpload(
+  formData: FormData
+): Promise<UploadDocumentResult> {
+  const storagePath = formData.get("storagePath") as string | null;
+
+  try {
+    const user = await getAuthUser();
+
+    const teamId = formData.get("teamId") as string | null;
+    const folderId = (formData.get("folderId") as string) || null;
+    const originalName = formData.get("fileName") as string | null;
+    const isPrivate = formData.get("isPrivate") === "true";
+    const fileSize = Number(formData.get("fileSize"));
+    const mimeType = getUploadMimeType(
+      originalName ?? "",
+      formData.get("mimeType") as string | null
+    );
+    const maxFileNameLength = clampFileNameLength(
+      formData.get("maxFileNameLength")
+    );
+
+    if (!storagePath || !teamId || !originalName) {
+      await removeStorageObject(storagePath);
+      return {
+        ok: false,
+        error: "Upload finished, but metadata was incomplete.",
+      };
+    }
+
+    if (!isStoragePathForTeam(storagePath, teamId)) {
+      await removeStorageObject(storagePath);
+      return {
+        ok: false,
+        error: "Upload storage path does not match the destination team.",
+      };
+    }
+
+    if (!Number.isFinite(fileSize) || fileSize <= 0) {
+      await removeStorageObject(storagePath);
+      return { ok: false, error: "Upload file is empty or unreadable." };
+    }
+
+    const displayName = await getAvailableFileName(
+      teamId,
+      folderId || null,
+      originalName,
+      maxFileNameLength
+    );
+
+    const record = await prisma.file.create({
+      data: {
+        teamId,
+        folderId,
+        name: displayName,
+        description: isPrivate ? "__VISIBILITY_PRIVATE__" : null,
+        storagePath,
+        sizeBytes: BigInt(fileSize),
+        mimeType,
+        status: "draft",
+        createdBy: user.id,
+      },
+    });
+
+    return { ok: true, file: serializeFile(record) };
+  } catch (error) {
+    console.error("Document upload finalization failed:", error);
+    await removeStorageObject(storagePath);
 
     return {
       ok: false,
